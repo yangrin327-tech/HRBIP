@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import pptxgen from "pptxgenjs";
 import { chromium } from "playwright";
 import { aggregate, effectiveCards, formatValue } from "../shared/analytics";
+import { parseDate } from "../shared/import";
 import {
   type Workspace,
   type Result,
@@ -128,6 +129,36 @@ function groups<T>(items: T[], size: number): T[][] {
     items.slice(i * size, (i + 1) * size),
   );
 }
+// Keep each source sentence together when a slide boundary is reached.
+// This prevents a new slide beginning with a trailing syllable or punctuation.
+function textPages(text: string): string[] {
+  const pages: string[] = [];
+  let current: string[] = [],
+    used = 0;
+  const paragraphs = text.split("\n").filter(Boolean);
+  for (let i = 0; i < paragraphs.length; i++) {
+    let paragraph = paragraphs[i];
+    if (/^(주요 현황|추가 확인 사항)$/.test(paragraph) && paragraphs[i + 1])
+      paragraph += "\n" + paragraphs[++i];
+    const lines = wrap(paragraph, 44);
+    if (used && used + lines.length > 10) {
+      pages.push(current.join("\n\n"));
+      current = [];
+      used = 0;
+    }
+    for (const part of groups(lines, 10)) {
+      if (used && used + part.length > 10) {
+        pages.push(current.join("\n\n"));
+        current = [];
+        used = 0;
+      }
+      current.push(part.join("\n"));
+      used += part.length + 1;
+    }
+  }
+  if (current.length) pages.push(current.join("\n\n"));
+  return pages;
+}
 export async function exportPptx(w: Workspace, r = aggregate(w)) {
   const pptx = new pptxgen();
   pptx.layout = "LAYOUT_WIDE";
@@ -153,7 +184,7 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
       y: 0.4,
       w: 12.1,
       h: 0.7,
-      fontSize: 23,
+      fontSize: 30,
       bold: true,
       color: "192C23",
       breakLine: false,
@@ -168,21 +199,139 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
         (r.filters.department || "전체 부서") +
         "  |  " +
         (r.filters.employmentType || "전체 고용형태"),
-      { x: 0.6, y: 7.02, w: 11.6, h: 0.24, fontSize: 9, color: "52665B" },
+      { x: 0.6, y: 7.02, w: 11.6, h: 0.26, fontSize: 12, color: "52665B" },
     );
     s.addText(String(++slideNumber), {
       x: 12.1,
       y: 7.02,
       w: 0.6,
       h: 0.24,
-      fontSize: 9,
+      fontSize: 12,
       color: "52665B",
       align: "right",
     });
     return s;
   };
-  for (const [idx, part] of groups(r.metrics, 10).entries()) {
-    const s = slide(idx === 0 ? w.title : "주요 지표 (계속)");
+  const cover = slide("");
+  cover.addText("HRBIP", {
+    x: 0.7,
+    y: 1.0,
+    w: 11.9,
+    h: 1.3,
+    fontSize: 86,
+    bold: true,
+    color: colors[0],
+    margin: 0,
+  });
+  cover.addText("HR Business Intelligence Partner", {
+    x: 0.75,
+    y: 2.5,
+    w: 11.8,
+    h: 0.5,
+    fontSize: 24,
+    color: colors[0],
+    margin: 0,
+  });
+  cover.addText(w.title, {
+    x: 0.75,
+    y: 3.6,
+    w: 11.8,
+    h: 1,
+    fontSize: 34,
+    bold: true,
+    color: "192C23",
+    margin: 0,
+    fit: "shrink",
+  });
+  cover.addText(r.filters.from + " ~ " + r.filters.to, {
+    x: 0.75,
+    y: 5.0,
+    w: 11.8,
+    h: 0.5,
+    fontSize: 26,
+    color: "192C23",
+    margin: 0,
+  });
+  cover.addText(
+    (r.filters.department || "전체 부서") +
+      " · " +
+      (r.filters.employmentType || "전체 고용형태") +
+      "\n자료가 있는 구간만 집계하며, 확인 불가 구간은 별도로 표시합니다.",
+    {
+      x: 0.75,
+      y: 5.7,
+      w: 11.8,
+      h: 0.9,
+      fontSize: 18,
+      color: "52665B",
+      margin: 0,
+    },
+  );
+  const scope = slide("요청 기간과 실제 자료 범위");
+  const scopeLines = ["요청 기간: " + r.filters.from + " ~ " + r.filters.to];
+  for (const role of ["people", "attendance", "payroll"] as const) {
+    const tables = w.datasets.filter((d) => d.role === role && !d.excluded);
+    if (role === "people") {
+      const dates = tables
+        .flatMap((d) =>
+          d.rows
+            .map((row) =>
+              parseDate(row[d.mapping.startDate || ""] || "", d.dateFormat),
+            )
+            .filter(Boolean),
+        )
+        .sort();
+      if (dates.length)
+        scopeLines.push("파일 내 입사일: " + dates[0] + " ~ " + dates.at(-1));
+      const ranges = [
+        ...new Set(
+          tables.map((d) =>
+            d.mode === "history"
+              ? d.coverageStart + " ~ " + d.coverageEnd
+              : d.asOf,
+          ),
+        ),
+      ];
+      scopeLines.push(
+        "인원 이력 확인 범위: " + (ranges.join(", ") || "자료 없음"),
+      );
+    } else {
+      const dates = tables
+        .flatMap((d) =>
+          d.rows
+            .map((row) =>
+              parseDate(row[d.mapping.date || ""] || "", d.dateFormat)?.slice(
+                0,
+                7,
+              ),
+            )
+            .filter(Boolean),
+        )
+        .sort();
+      scopeLines.push(
+        (role === "attendance" ? "근태·휴가" : "인건비") +
+          " 기록: " +
+          (dates.length ? dates[0] + " ~ " + dates.at(-1) : "자료 없음"),
+      );
+    }
+  }
+  scopeLines.push(
+    "과거 입사일만으로 당시 전체 직원 명단과 퇴사 이력을 복원하지 않습니다.",
+    "자료가 없는 월은 0이 아닌 ‘자료 없음’으로 표시합니다.",
+  );
+  scope.addText(scopeLines.join("\n\n"), {
+    x: 0.7,
+    y: 1.45,
+    w: 11.9,
+    h: 5.1,
+    fontSize: 21,
+    color: "192C23",
+    margin: 0,
+    paraSpaceAfter: 4,
+    valign: "top",
+  });
+  for (const [idx, part] of groups(r.metrics, 5).entries()) {
+    const s = slide(idx === 0 ? "주요 지표" : "주요 지표 (계속)");
     s.addTable(
       [
         ["지표", "값", "단위", "범위"],
@@ -200,7 +349,7 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
         h: 4.7,
         colW: [3.6, 2, 1, 5.5],
         fontFace: "맑은 고딕",
-        fontSize: 13,
+        fontSize: 17,
         border: { color: "DBE5DA", pt: 0.6 },
         fill: { color: "F5F8F2" },
         margin: 8,
@@ -224,15 +373,15 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
     ],
   ]) {
     if (!text) continue;
-    for (const part of groups(wrap(text), 15)) {
+    for (const part of textPages(text)) {
       const s = slide(title);
-      s.addText(part.join("\n"), {
+      s.addText(part, {
         x: 0.65,
         y: 1.35,
         w: 12,
         h: 5.3,
         fontFace: "맑은 고딕",
-        fontSize: 15,
+        fontSize: 19,
         color: "192C23",
         breakLine: false,
         margin: 0,
@@ -243,19 +392,41 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
   }
   for (const card of effectiveCards(w, r).filter((c) => c.visible)) {
     const c = r.charts.find((c) => c.id === card.id)!;
+    const first = c.points.findIndex((p) => p.value !== null);
+    const last =
+      c.points.length -
+      1 -
+      [...c.points].reverse().findIndex((p) => p.value !== null);
+    const shown = first < 0 ? c.points : c.points.slice(first, last + 1);
+    const trimmed = c.points.length - shown.length;
     for (const [page, points] of groups(
-      c.points,
-      card.type === "horizontal" || card.type === "pie" ? 12 : 36,
+      shown,
+      card.type === "table"
+        ? 9
+        : card.type === "horizontal" || card.type === "pie"
+          ? 10
+          : Math.max(1, Math.ceil(shown.length / Math.ceil(shown.length / 14))),
     ).entries()) {
       const s = slide(card.title + (page ? " (계속)" : ""));
-      s.addText(c.unit + " / " + c.series.join("·"), {
-        x: 0.65,
-        y: 1.13,
-        w: 12,
-        h: 0.28,
-        fontSize: 11,
-        color: "52665B",
-      });
+      const millionAxis =
+        c.unit === "원" &&
+        points.some((p) => Math.abs(p.value || 0) >= 1000000);
+      s.addText(
+        (millionAxis ? "축 단위: 백만 원" : c.unit) +
+          " / " +
+          c.series.join("·") +
+          (c.filter === "month" && points.length
+            ? "  ·  " + points[0].label + " ~ " + points.at(-1)!.label
+            : ""),
+        {
+          x: 0.65,
+          y: 1.13,
+          w: 12,
+          h: 0.28,
+          fontSize: 15,
+          color: "52665B",
+        },
+      );
       if (card.type === "table") {
         s.addTable(
           [["기간/범주", ...c.series], ...pointRows({ ...c, points })].map(
@@ -267,7 +438,7 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
             w: 12,
             h: 4.6,
             fontFace: "맑은 고딕",
-            fontSize: 12,
+            fontSize: 17,
             border: { color: "DBE5DA", pt: 0.5 },
             autoPage: true,
             autoPageRepeatHeader: true,
@@ -299,14 +470,22 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
             x: 0.65,
             y: 1.6,
             w: 12,
-            h: 4.65,
+            h: 4.35,
             catAxisLabelFontFace: "맑은 고딕",
-            catAxisLabelFontSize: 11,
+            catAxisLabelFontSize: 14,
             valAxisLabelFontFace: "맑은 고딕",
-            valAxisLabelFontSize: 10,
+            valAxisLabelFontSize: 14,
+            valAxisLabelFormatCode: millionAxis ? '#,##0,,"백만"' : "#,##0.##",
+            ...(c.unit === "명" &&
+            Math.max(
+              ...valid.map((p) => p.value || 0),
+              ...valid.map((p) => p.value2 || 0),
+            ) <= 10
+              ? { valAxisMajorUnit: 1 }
+              : {}),
             showLegend: c.series.length > 1 || card.type === "pie",
             legendFontFace: "맑은 고딕",
-            legendFontSize: 11,
+            legendFontSize: 14,
             showValue: false,
             chartColors: colors,
             valAxisMinVal: Math.min(
@@ -319,20 +498,22 @@ export async function exportPptx(w: Workspace, r = aggregate(w)) {
             barGrouping: "clustered",
             displayBlanksAs: "gap",
           });
-        if (missing)
+        if (missing || trimmed)
           s.addText(
-            "자료 없는 " +
-              missing +
-              "개 구간은 차트에서 제외. 빈 구간 연결 방지를 위해 선그래프는 막대로 출력합니다. 전체 값은 Excel/PDF 표에서 확인하세요.",
-            { x: 0.65, y: 6.17, w: 12, h: 0.32, fontSize: 10, color: "825A20" },
+            "요청 범위 중 자료가 있는 구간을 표시합니다." +
+              (missing
+                ? " 중간 결측은 제외하고 선그래프를 막대로 대체합니다."
+                : "") +
+              " 전체 기간·결측값은 Excel에서 확인할 수 있어요.",
+            { x: 0.65, y: 6.08, w: 12, h: 0.4, fontSize: 13, color: "825A20" },
           );
       }
       s.addText(c.reason, {
         x: 0.65,
         y: 6.55,
         w: 12,
-        h: 0.32,
-        fontSize: 10,
+        h: 0.38,
+        fontSize: 13,
         color: "52665B",
         fit: "shrink",
       });

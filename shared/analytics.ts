@@ -300,7 +300,7 @@ export function aggregate(w: Workspace): Result {
       : !w.basisConfirmed
         ? "집계 기준 확인 필요"
         : invalidPeriod
-          ? "기간은 올바른 월 순서로 최대 36개월"
+          ? "기간은 올바른 월 순서로 최대 120개월"
           : errors.length
             ? "데이터 확인에서 오류 처리 필요"
             : "";
@@ -429,16 +429,24 @@ export function aggregate(w: Workspace): Result {
           : "확인 가능한 시점이 하나여서 막대그래프로 현재 값을 보여드려요.",
       filter: "month",
     });
-    if (now !== null) {
+    const lastObservedMonth = trend
+      .filter((p) => p.value !== null)
+      .at(-1)?.label;
+    if (lastObservedMonth) {
+      const departmentDate =
+        now !== null ? latest : monthEnd(lastObservedMonth);
       const groups = new Map<string, Set<string>>();
-      for (const p of onDate(latest)) {
+      for (const p of onDate(departmentDate)) {
         const dep = current.get(p.id)?.department || "부서 미입력";
         if (!groups.has(dep)) groups.set(dep, new Set());
         groups.get(dep)!.add(p.id);
       }
       charts.push({
         id: "department",
-        title: "기준월 말 부서별 인원",
+        title:
+          now !== null
+            ? "기준월 말 부서별 인원"
+            : lastObservedMonth + " 마지막 확인 부서별 인원",
         unit: "명",
         series: ["재직 인원"],
         points: [...groups]
@@ -447,7 +455,11 @@ export function aggregate(w: Workspace): Result {
         recommended: "horizontal",
         allowed: ["horizontal", "bar", "pie", "table"],
         reason:
-          "부서 이름을 읽고 인원 규모를 비교하기 쉽게 가로 막대를 추천해요. 부서는 최신 제공 분류 기준이에요.",
+          lastObservedMonth +
+          " 월말의 부서별 규모를 비교해요. 부서는 최신 제공 분류 기준이에요." +
+          (now === null
+            ? " 요청 종료월 자료가 없어 마지막 확인 시점을 별도로 표시했어요."
+            : ""),
         filter: "department",
       });
     }
@@ -470,7 +482,7 @@ export function aggregate(w: Workspace): Result {
       filter: "month",
     });
   const notices: string[] = [];
-  if (invalidPeriod) notices.push("기간은 1~36개월로 선택하세요.");
+  if (invalidPeriod) notices.push("기간은 1~120개월로 선택하세요.");
   if (!w.basisConfirmed) notices.push("생성 전에 집계 기준을 확인하세요.");
   if (peopleSources.some((d) => d.mode === "current"))
     notices.push(
@@ -480,6 +492,25 @@ export function aggregate(w: Workspace): Result {
     notices.push(
       "완전 이력으로 확인된 기간 밖의 인원 값은 계산하지 않았습니다.",
     );
+  if (now === null && available.people) {
+    const last = trend.filter((p) => p.value !== null).at(-1);
+    if (last) {
+      metrics.push({
+        id: "lastObservedHeadcount",
+        label: last.label + " 마지막 확인 인원",
+        value: last.value,
+        unit: "명",
+        note: "요청 종료월의 인원이 아닙니다. 마지막으로 확인 가능한 월말 값",
+      });
+      notices.push(
+        "요청 종료월 인원은 확인할 수 없습니다. 마지막 확인 월 " +
+          last.label +
+          "의 인원은 " +
+          last.value +
+          "명입니다.",
+      );
+    }
+  }
   if (pp.length)
     notices.push(
       "부서·고용형태는 최신 제공 분류입니다. 과거 조직 이력을 뜻하지 않습니다.",
@@ -526,6 +557,16 @@ export function aggregate(w: Workspace): Result {
         });
       }
     eventRowsCount += facts.length;
+    const recordedMonths = unique(facts.map((f) => f.month));
+    if (facts.length && recordedMonths.length < allMonths.length)
+      notices.push(
+        (role === "attendance" ? "근태·휴가" : "인건비") +
+          ": 요청한 " +
+          allMonths.length +
+          "개월 중 " +
+          recordedMonths.length +
+          "개월의 제공 자료를 합산했습니다. 나머지 기간은 자료가 없습니다.",
+      );
     const sum = (a: Fact[]) => {
       if (!a.length) return null;
       if (role === "payroll")
@@ -533,6 +574,7 @@ export function aggregate(w: Workspace): Result {
       return Math.round(a.reduce((n, f) => n + f.value, 0) * 1000) / 1000;
     };
     const add = (id: string, title: string, unit: string, rows: Fact[]) => {
+      const observed = unique(rows.map((f) => f.month)).sort();
       const points = allMonths.map((label) => ({
         label,
         value: sum(rows.filter((f) => f.month === label)),
@@ -542,7 +584,16 @@ export function aggregate(w: Workspace): Result {
         label: title,
         value: sum(rows),
         unit,
-        note: filters.from + " ~ " + filters.to + " 제공 자료 합계",
+        note: observed.length
+          ? observed[0] +
+            " ~ " +
+            observed.at(-1) +
+            " 자료 " +
+            observed.length +
+            "/" +
+            allMonths.length +
+            "개월 합계"
+          : "선택한 조건에서 이 항목의 자료가 없습니다.",
       });
       if (rows.length)
         charts.push({

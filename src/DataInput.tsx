@@ -16,6 +16,7 @@ import {
 } from "./files";
 import { Button, Notice, PageTitle, Steps } from "./ui";
 import { SheetSetup } from "./SheetSetup";
+import { recognizeHrWorkbook, prepareHrWorkbook } from "./hr-workbook";
 type Props = {
   w: Workspace;
   setW: (fn: (w: Workspace) => void) => void;
@@ -88,6 +89,20 @@ export function DataInput({
       setError((e as Error).message);
     }
   }
+  const recommended = !w.datasets.length && recognizeHrWorkbook(sheets);
+  function applyRecommended() {
+    try {
+      const prepared = prepareHrWorkbook(sheets);
+      setW((v) => {
+        const retain = v.retainOriginals;
+        Object.assign(v, prepared, { retainOriginals: retain });
+      });
+      setSheets([]);
+      onNext();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   return (
     <>
       <PageTitle
@@ -140,8 +155,59 @@ export function DataInput({
           </p>
           {error && <Notice tone="error">{error}</Notice>}
           {sheets.length > 0 && (
-            <div className="sheet-list">
-              <h3>가져올 시트와 헤더 행</h3>
+            <Notice tone="success">
+              <div>
+                <strong>
+                  업로드 완료 · {sheets.length}개 시트를 읽었어요.
+                </strong>
+                <p>{originals.map((o) => o.name).join(", ")}</p>
+                <span>다음으로 분석할 자료와 연결 기준을 확인해 주세요.</span>
+              </div>
+            </Notice>
+          )}
+          {recommended && (
+            <section className="import-recommendation">
+              <span className="tag">통합 인사 파일 연결 추천</span>
+              <h3>이 파일은 한 번에 연결할 수 있어요.</h3>
+              <p>
+                직원 명단과 월별 인사·근태·인건비 4개 시트를 연결해요. 아래
+                기준이 파일의 의미와 같은지 확인해 주세요.
+              </p>
+              <ul>
+                <li>
+                  입사일·퇴사일은 그대로 보존해요. 부서·고용형태는 사번별 마지막
+                  관측값을 연결해요.
+                </li>
+                <li>
+                  전체 인원 이력은 첫 기준월 직전 월말부터 마지막 기준월 말까지
+                  확인된 것으로 처리해요. 더 오래된 입사일을 이력 전체가 있다는
+                  뜻으로 해석하지 않아요.
+                </li>
+                <li>
+                  이 파일의 퇴사일은 <strong>첫 미재직일</strong>로 제안해요.
+                  다음 화면에서 바꿀 수 있어요.
+                </li>
+                <li>
+                  총근무·연장은 시간, 총휴가는 일 단위예요. 총근무에는
+                  연장시간이 포함돼요.
+                </li>
+                <li>
+                  인건비는 총지급액 + 회사부담보험료 + 퇴직급여충당액을
+                  합산해요. 별도 총인건비 열을 다시 더하지 않아요.
+                </li>
+                <li>
+                  항목설명·집계기준 시트와 이름·생년월일은 집계에서 제외해요.
+                  원본 파일은 그대로 유지돼요.
+                </li>
+              </ul>
+              <Button variant="primary" onClick={applyRecommended}>
+                추천 연결을 확인하고 적용 <ArrowRight size={19} />
+              </Button>
+            </section>
+          )}
+          {sheets.length > 0 && (
+            <details className="sheet-list" open={!recommended}>
+              <summary>시트별로 직접 연결하기</summary>
               {sheets.map((s) => (
                 <SheetSetup
                   key={s.id}
@@ -151,7 +217,7 @@ export function DataInput({
                   }
                 />
               ))}
-            </div>
+            </details>
           )}
           {w.datasets.length > 0 && (
             <div className="sheet-list">

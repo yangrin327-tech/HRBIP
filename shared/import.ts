@@ -122,10 +122,10 @@ export function months(from: string, to: string): string[] {
     return [];
   const out: string[] = [];
   let cur = from;
-  while (cur <= to && out.length < 37) {
+  while (cur <= to && out.length < 121) {
     out.push(cur);
     const [y, m] = cur.split("-").map(Number);
     cur = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7);
   }
-  return out.length > 36 ? [] : out;
+  return out.length > 120 ? [] : out;
 }

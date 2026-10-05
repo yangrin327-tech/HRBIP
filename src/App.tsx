@@ -343,7 +343,7 @@ export default function App() {
       if (!v.report.generated)
         v.report = {
           generated: draft(r),
-          notes: "",
+          notes: v.report.notes,
           basisKey: r.key,
           reviewedKey: "",
         };
@@ -409,10 +409,9 @@ export default function App() {
           <button onClick={() => setRequestOpen(true)}>기능 요청</button>
         </nav>
         <div className="account-nav">
-          <span className="local-badge">
-            <i />
-            로컬 워크스페이스
-          </span>
+          <Button variant="primary" onClick={() => start()}>
+            <Plus size={19} />새 보고서
+          </Button>
           {user ? (
             <Button onClick={() => setAccountOpen(true)}>
               <span className="avatar">{user.username[0].toUpperCase()}</span>
@@ -461,7 +460,7 @@ export default function App() {
             <strong>
               반복은 줄이고,
               <br />
-              사람에게 더 집중하세요.
+              사람에게 집중하세요.
             </strong>
             <p>
               인사 업무를 위한
@@ -469,7 +468,7 @@ export default function App() {
               작은 도구부터 함께.
             </p>
             <button onClick={() => setRequestOpen(true)}>
-              필요한 기능 알려주기 <ArrowUpRight size={16} />
+              기능 제안하기 <ArrowUpRight size={16} />
             </button>
           </div>
         </aside>
@@ -514,16 +513,28 @@ export default function App() {
                     <span className="tiny-dot" />
                     YOUR HR WORK PARTNER
                   </div>
-                  <h1>
+                  <h1 className="hero-brand">HRBIP</h1>
+                  <div className="hero-brand-name">
+                    HR Business Intelligence Partner
+                  </div>
+                  <h2 className="hero-message">
                     흩어진 인사 자료를
                     <br />
-                    <span>한눈에 보는 현황으로.</span>
-                  </h1>
+                    한눈에 보는 현황으로.
+                  </h2>
                   <p>
                     자료 확인부터 대시보드, 보고서까지.
                     <br />
                     인사 업무의 다음 단계를 HRBIP와 함께하세요.
                   </p>
+                  <div className="hero-actions">
+                    <Button variant="primary" onClick={() => start()}>
+                      보고서 만들기 <ArrowRight size={22} />
+                    </Button>
+                    <Button onClick={() => setSampleListOpen(true)}>
+                      샘플로 먼저 보기
+                    </Button>
+                  </div>
                 </div>
                 <div className="intro-illustration" aria-hidden="true">
                   <div className="paper back" />

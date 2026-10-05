@@ -583,7 +583,7 @@ export function DataReview({
         </label>
         {!months(w.filters.from, w.filters.to).length && (
           <Notice tone="error">
-            보고 기간은 올바른 월 순서로 최대 36개월까지 선택하세요.
+            보고 기간은 올바른 월 순서로 최대 120개월까지 선택하세요.
           </Notice>
         )}
       </section>

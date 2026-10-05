@@ -230,7 +230,7 @@ test("CSV upload: mapping, invalid cell correction, criteria, result and XLSX ex
     mimeType: "text/csv",
     buffer: Buffer.from(csv),
   });
-  await expect(page.getByText("가져올 시트와 헤더 행")).toBeVisible();
+  await expect(page.getByText("시트별로 직접 연결하기")).toBeVisible();
   await page.getByRole("button", { name: "항목 연결·데이터 확인" }).click();
   await page.getByLabel("이력 확인 시작일").fill("2026-01-01");
   await page.getByLabel("이력 확인 종료일").fill("2026-09-30");
