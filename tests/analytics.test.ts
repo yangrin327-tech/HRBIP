@@ -1,9 +1,47 @@
 import test from "node:test";
+
 import assert from "node:assert/strict";
 import { sampleWorkspace } from "../shared/sample";
 import { aggregate, validate, draft } from "../shared/analytics";
 import { parseDate, numeric } from "../shared/import";
 import { emptyWorkspace, newDataset } from "../shared/model";
+test("large positive/negative payroll sums do not lose integer precision", () => {
+  const w = sampleWorkspace();
+  w.datasets = [w.datasets[2]];
+  const d = w.datasets[0];
+  d.rows = [
+    ["A", "2026-09-01", "salary", "9007199254740991"],
+    ["B", "2026-09-01", "salary", "1"],
+    ["C", "2026-09-01", "salary", "-9007199254740991"],
+  ].map(([id, date, cat, value]) => ({
+    "기록 ID": id,
+    사번: id,
+    기준일: date,
+    항목: cat,
+    값: value,
+  }));
+  const r = aggregate(w);
+  assert.equal(r.metrics.find((m) => m.id === "payTrend")?.value, 1);
+  d.rows.push({
+    "기록 ID": "D",
+    사번: "D",
+    기준일: "2026-09-01",
+    항목: "salary",
+    값: "9007199254740991",
+  });
+  assert.equal(aggregate(w).available.payroll, false);
+});
+test("month-end inclusive exit counts are not equated with hires minus exits", () => {
+  const w = sampleWorkspace();
+  w.datasets = [w.datasets[0]];
+  w.datasets[0].rows = [
+    { 사번: "A", 입사일: "2026-01-01", 퇴사일: "2026-09-30", 부서: "HR" },
+  ];
+  const r = aggregate(w);
+  assert.equal(r.metrics.find((m) => m.id === "delta")?.value, 0);
+  assert.equal(r.metrics.find((m) => m.id === "left")?.value, 1);
+});
+
 test("sample is calculated from three real datasets without join multiplication", () => {
   const w = sampleWorkspace(),
     r = aggregate(w);

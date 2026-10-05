@@ -526,10 +526,12 @@ export function aggregate(w: Workspace): Result {
         });
       }
     eventRowsCount += facts.length;
-    const sum = (a: Fact[]) =>
-      a.length
-        ? Math.round(a.reduce((n, f) => n + f.value, 0) * 1000) / 1000
-        : null;
+    const sum = (a: Fact[]) => {
+      if (!a.length) return null;
+      if (role === "payroll")
+        return Number(a.reduce((n, f) => n + BigInt(f.value), 0n));
+      return Math.round(a.reduce((n, f) => n + f.value, 0) * 1000) / 1000;
+    };
     const add = (id: string, title: string, unit: string, rows: Fact[]) => {
       const points = allMonths.map((label) => ({
         label,
@@ -584,7 +586,24 @@ export function aggregate(w: Workspace): Result {
       );
     } else {
       const total = sum(facts);
-      if (total !== null && !Number.isSafeInteger(total)) {
+      const groupTotals = new Map<string, bigint>();
+      for (const fact of facts)
+        for (const group of [
+          "all",
+          "month:" + fact.month,
+          "category:" + fact.category,
+        ])
+          groupTotals.set(
+            group,
+            (groupTotals.get(group) || 0n) + BigInt(fact.value),
+          );
+      if (
+        [...groupTotals.values()].some(
+          (n) =>
+            n > BigInt(Number.MAX_SAFE_INTEGER) ||
+            n < BigInt(Number.MIN_SAFE_INTEGER),
+        )
+      ) {
         available.payroll = false;
         reasons.payroll = "총액이 안전한 정수 범위를 초과함";
         notices.push(reasons.payroll);
@@ -607,7 +626,9 @@ export function aggregate(w: Workspace): Result {
             "horizontal",
             "bar",
             "table",
-            ...(facts.every((f) => f.value >= 0) ? ["pie" as const] : []),
+            ...(total !== null && total > 0 && facts.every((f) => f.value >= 0)
+              ? ["pie" as const]
+              : []),
           ],
           reason:
             "제공된 지급 항목별 규모를 비교해요. 이 합계가 회사 전체 인건비를 뜻하지는 않아요.",

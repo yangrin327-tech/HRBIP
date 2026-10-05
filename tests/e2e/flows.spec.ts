@@ -5,15 +5,13 @@ test("wide monthly cost file can be reshaped in the UI without editing its origi
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
-  await page
-    .getByLabel("파일 업로드")
-    .setInputFiles({
-      name: "wide.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        "사번,기준월,기본급,식대,총액\nA,2026-09-01,3000000,200000,3200000",
-      ),
-    });
+  await page.getByLabel("파일 업로드").setInputFiles({
+    name: "wide.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "사번,기준월,기본급,식대,총액\nA,2026-09-01,3000000,200000,3200000",
+    ),
+  });
   await page.getByLabel("표 구조").selectOption("columns");
   await page.getByLabel("분석 영역").selectOption("payroll");
   await page.getByLabel("사번 열", { exact: true }).selectOption("사번");
@@ -171,6 +169,21 @@ test("guest sample, report editing, linked filters, chart editor and PDF downloa
   await expect(
     page.getByRole("heading", { name: "2026년 3분기 인사현황", exact: true }),
   ).toBeVisible();
+  await page.screenshot({ path: "artifacts/verification/HRBIP-dashboard.png" });
+  const departmentCard = page
+    .locator(".chart-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "기준월 말 부서별 인원",
+        exact: true,
+      }),
+    });
+  await departmentCard.locator(".recharts-bar-rectangle").first().click();
+  await expect(page.getByLabel("부서", { exact: true })).toHaveValue(
+    "제품개발",
+  );
+  await expect(page.locator(".primary-metric strong")).toContainText("9");
+  await page.getByRole("button", { name: "전체 필터 초기화" }).click();
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   const notes = page.getByLabel("담당자 설명·의견");
   await notes.fill("직접 작성한 의견이 유지되어야 합니다.");
@@ -212,13 +225,11 @@ test("CSV upload: mapping, invalid cell correction, criteria, result and XLSX ex
   await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
   const csv =
     "사번,입사일,퇴사일,부서,고용형태\nA,2026-01-01,,인사,정규직\nB,2026-02-30,2026-09-30,인사,계약직";
-  await page
-    .getByLabel("파일 업로드")
-    .setInputFiles({
-      name: "synthetic.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(csv),
-    });
+  await page.getByLabel("파일 업로드").setInputFiles({
+    name: "synthetic.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
   await expect(page.getByText("가져올 시트와 헤더 행")).toBeVisible();
   await page.getByRole("button", { name: "항목 연결·데이터 확인" }).click();
   await page.getByLabel("이력 확인 시작일").fill("2026-01-01");

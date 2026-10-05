@@ -1,10 +1,11 @@
 # HRBIP 제품 요구사항 문서
 
 - 제품명: **HRBIP — HR Business Intelligence Partner**
-- 버전: v0.3
+- 버전: v0.4
 - 작성일 / 최종 수정일: 2026-10-05
-- 상태: 17개 질문의 사용자 답변을 통합한 기획안. 웹 구현 전.
-- 착수 조건: **사용자가 웹 제작을 명시적으로 요청하면 구현을 시작한다. 현재는 기획 정리만 수행한다.**
+- 상태: 사용자 제작 요청을 반영한 로컬 1차 구현 기준. [구현·검증 결과](docs/VALIDATION.md) 참고.
+- 착수 조건 충족: 2026-10-05 실제 웹 제작 요청. 로컬 1차 버전 구현. 외부 배포는 별도 확인.
+- 구체화된 지표/파일 계약: [METRICS](docs/METRICS.md), 기능 현황: [IMPLEMENTATION](docs/IMPLEMENTATION.md), 보관·권한: [OPERATIONS](docs/OPERATIONS.md).
 - 연결 문서: [질문·답변 정리](INTERVIEW_SUMMARY.md), [제작 흐름](BUILD_PLAN.md), [프로젝트 기록](PROJECT_LOG.md), [작업일지](WORKLOG.md)
 
 ## 1. 제품 정의
