@@ -60,6 +60,7 @@ export default function App() {
     [accountOpen, setAccountOpen] = useState(false),
     [requestOpen, setRequestOpen] = useState(false);
   const [sampleListOpen, setSampleListOpen] = useState(false);
+  const [returnToSaved, setReturnToSaved] = useState(false);
   const [workId, setWorkId] = useState(""),
     [revision, setRevision] = useState(0),
     [dirty, setDirty] = useState(false),
@@ -176,9 +177,13 @@ export default function App() {
   }
   async function loadSaved() {
     if (!user) {
+      setReturnToSaved(true);
       setAuthOpen(true);
       return;
     }
+    await fetchSaved();
+  }
+  async function fetchSaved() {
     setBusy(true);
     setError("");
     try {
@@ -334,7 +339,13 @@ export default function App() {
         { workspace: w },
         w.title + "." + format,
       );
-    notify(format.toUpperCase() + " 파일을 만들었어요.");
+    notify(
+      format.toUpperCase() +
+        " 파일을 만들었어요." +
+        (!user
+          ? " 작업 목록에 남기려면 로그인 후 저장해 주세요."
+          : " 작업도 저장했어요."),
+    );
   }
   function createResult() {
     const r = aggregate(w);
@@ -393,25 +404,7 @@ export default function App() {
             HRBIP<small>HR Business Intelligence Partner</small>
           </span>
         </button>
-        <nav className="top-nav" aria-label="주요 메뉴">
-          <button
-            className={route === "home" ? "active" : ""}
-            onClick={() => navigate("home")}
-          >
-            업무 도구
-          </button>
-          <button
-            className={route === "saved" ? "active" : ""}
-            onClick={loadSaved}
-          >
-            저장한 작업
-          </button>
-          <button onClick={() => setRequestOpen(true)}>기능 요청</button>
-        </nav>
         <div className="account-nav">
-          <Button variant="primary" onClick={() => start()}>
-            <Plus size={19} />새 보고서
-          </Button>
           {user ? (
             <Button onClick={() => setAccountOpen(true)}>
               <span className="avatar">{user.username[0].toUpperCase()}</span>
@@ -428,31 +421,33 @@ export default function App() {
       <div className="workspace">
         <aside className="sidebar">
           <div className="sidebar-label">WORKSPACE</div>
-          <button
-            className={route === "home" ? "selected" : ""}
-            onClick={() => navigate("home")}
-          >
-            <Grid2X2 size={19} />
-            모든 도구
-          </button>
-          <button
-            className={
-              ["input", "verify", "result"].includes(route) ? "selected" : ""
-            }
-            onClick={() =>
-              w.datasets.length && !shared ? navigate("result") : start()
-            }
-          >
-            <BarChart3 size={19} />
-            인사현황 보고서
-          </button>
-          <button
-            className={route === "saved" ? "selected" : ""}
-            onClick={loadSaved}
-          >
-            <FolderOpen size={19} />
-            저장한 작업
-          </button>
+          <nav className="workspace-nav" aria-label="워크스페이스">
+            <button
+              className={route === "home" ? "selected" : ""}
+              onClick={() => navigate("home")}
+            >
+              <Grid2X2 size={19} />
+              모든 도구
+            </button>
+            <button
+              className={
+                ["input", "verify", "result"].includes(route) ? "selected" : ""
+              }
+              onClick={() =>
+                w.datasets.length && !shared ? navigate("result") : start()
+              }
+            >
+              <BarChart3 size={19} />
+              인사현황 보고서
+            </button>
+            <button
+              className={route === "saved" ? "selected" : ""}
+              onClick={loadSaved}
+            >
+              <FolderOpen size={19} />
+              저장한 작업
+            </button>
+          </nav>
           <div className="sidebar-bottom">
             <span className="round-icon">
               <Leaf size={20} />
@@ -692,32 +687,52 @@ export default function App() {
             />
           )}
           {(route === "result" || shared) && (
-            <Results
-              w={w}
-              r={result}
-              setW={setW}
-              onFilters={(f) => {
-                if (shared) void openShared(sharedId, f);
-                else
-                  setW((v) => {
-                    v.filters = f;
-                  });
-              }}
-              onSave={() => save()}
-              onTemplate={() => {
-                if (!user) {
-                  setAuthOpen(true);
-                  return;
-                }
-                setTemplateTitle(w.title + " 구성");
-                setTemplateOpen(true);
-              }}
-              onShare={beginShare}
-              onExport={exportCurrent}
-              onBack={() => navigate("verify")}
-              readOnly={shared}
-              busy={busy}
-            />
+            <>
+              {!shared && (
+                <div className="save-state" role="status">
+                  <strong>
+                    {workId
+                      ? dirty
+                        ? "저장 후 변경사항이 있어요"
+                        : "저장한 작업이에요"
+                      : "아직 저장하지 않은 작업이에요"}
+                  </strong>
+                  <span>
+                    {workId && !dirty
+                      ? "워크스페이스의 ‘저장한 작업’에서 다시 열 수 있어요."
+                      : !user
+                        ? "로그인 후 저장하면 다음 방문에도 이어서 볼 수 있어요. 파일 다운로드만으로는 작업 목록에 남지 않아요."
+                        : "보고서의 저장 버튼으로 현재 데이터와 편집 내용을 작업 목록에 남겨주세요."}
+                  </span>
+                </div>
+              )}
+              <Results
+                w={w}
+                r={result}
+                setW={setW}
+                onFilters={(f) => {
+                  if (shared) void openShared(sharedId, f);
+                  else
+                    setW((v) => {
+                      v.filters = f;
+                    });
+                }}
+                onSave={() => save()}
+                onTemplate={() => {
+                  if (!user) {
+                    setAuthOpen(true);
+                    return;
+                  }
+                  setTemplateTitle(w.title + " 구성");
+                  setTemplateOpen(true);
+                }}
+                onShare={beginShare}
+                onExport={exportCurrent}
+                onBack={() => navigate("verify")}
+                readOnly={shared}
+                busy={busy}
+              />
+            </>
           )}
           {route === "saved" && (
             <>
@@ -868,11 +883,18 @@ export default function App() {
       </div>
       {authOpen && (
         <AuthModal
-          onClose={() => setAuthOpen(false)}
+          onClose={() => {
+            setAuthOpen(false);
+            setReturnToSaved(false);
+          }}
           onSuccess={(u) => {
             setUser(u);
             setAuthOpen(false);
             notify("로그인했어요. 작성 중인 내용은 그대로 유지돼요.");
+            if (returnToSaved) {
+              setReturnToSaved(false);
+              void fetchSaved();
+            }
           }}
         />
       )}

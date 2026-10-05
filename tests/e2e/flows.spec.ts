@@ -169,15 +169,19 @@ test("guest sample, report editing, linked filters, chart editor and PDF downloa
   await expect(
     page.getByRole("heading", { name: "2026년 3분기 인사현황", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".save-state")).toContainText(
+    "아직 저장하지 않은 작업",
+  );
+  await expect(page.locator(".save-state")).toContainText(
+    "파일 다운로드만으로는 작업 목록에 남지 않아요",
+  );
   await page.screenshot({ path: "artifacts/verification/HRBIP-dashboard.png" });
-  const departmentCard = page
-    .locator(".chart-card")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "기준월 말 부서별 인원",
-        exact: true,
-      }),
-    });
+  const departmentCard = page.locator(".chart-card").filter({
+    has: page.getByRole("heading", {
+      name: "기준월 말 부서별 인원",
+      exact: true,
+    }),
+  });
   await departmentCard.locator(".recharts-bar-rectangle").first().click();
   await expect(page.getByLabel("부서", { exact: true })).toHaveValue(
     "제품개발",
@@ -331,16 +335,23 @@ test("real registration, save/reopen, template reuse without old data, feature r
     .getByRole("button", { name: "템플릿 저장", exact: true })
     .click();
   await page
-    .getByRole("navigation", { name: "주요 메뉴" })
+    .getByRole("navigation", { name: "워크스페이스" })
     .getByRole("button", { name: "저장한 작업", exact: true })
     .click();
   await page.getByRole("button", { name: "열기", exact: true }).click();
+  await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await expect(page.getByLabel("담당자 설명·의견")).toHaveValue(
     "다시 열기 검증용 의견",
   );
+  await page.getByLabel("담당자 설명·의견").fill("다시 열어 수정한 의견");
+  await expect(page.locator(".save-state")).toContainText(
+    "저장 후 변경사항이 있어요",
+  );
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
   await page
-    .getByRole("navigation", { name: "주요 메뉴" })
+    .getByRole("navigation", { name: "워크스페이스" })
     .getByRole("button", { name: "저장한 작업", exact: true })
     .click();
   await page.getByRole("button", { name: "새 데이터 적용" }).click();
@@ -349,8 +360,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
   ).toBeVisible();
   await expect(page.getByText("현재 작업에 연결한 표")).toHaveCount(0);
   await page
-    .getByRole("navigation", { name: "주요 메뉴" })
-    .getByRole("button", { name: "기능 요청", exact: true })
+    .getByRole("button", { name: "기능 제안하기", exact: true })
     .click();
   await page
     .getByLabel("원하는 기능", { exact: true })
@@ -376,6 +386,52 @@ test("real registration, save/reopen, template reuse without old data, feature r
     path: "artifacts/verification/dashboard-mobile.png",
     fullPage: true,
   });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("workspace navigation stays available on mobile and login returns to saved work", async ({
+  page,
+}) => {
+  const username = "history" + Date.now();
+  const password = "synthetic-history-password-12345";
+  const registered = await page.request.post("/api/auth/register", {
+    data: { username, password },
+  });
+  expect(registered.status()).toBe(201);
+  await page.request.post("/api/auth/logout", { data: {} });
+  await page.goto("/");
+  const header = page.getByRole("banner");
+  await expect(header.getByRole("button")).toHaveCount(2);
+  await expect(header.getByRole("navigation")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "새 보고서", exact: true }),
+  ).toHaveCount(0);
+  const workspace = page.getByRole("navigation", { name: "워크스페이스" });
+  await expect(workspace.getByRole("button")).toHaveCount(3);
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const button of await workspace.getByRole("button").all()) {
+    await expect(button).toBeInViewport();
+  }
+  await workspace
+    .getByRole("button", { name: "저장한 작업", exact: true })
+    .click();
+  await page.getByLabel("아이디", { exact: true }).fill(username);
+  await page.getByLabel("비밀번호", { exact: true }).fill(password);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "로그인", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", {
+      name: "저장한 작업·공유받은 보고서",
+      exact: true,
+    }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
