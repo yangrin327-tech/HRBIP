@@ -59,6 +59,7 @@ export default function App() {
     [authOpen, setAuthOpen] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
     [requestOpen, setRequestOpen] = useState(false);
+  const [sampleListOpen, setSampleListOpen] = useState(false);
   const [workId, setWorkId] = useState(""),
     [revision, setRevision] = useState(0),
     [dirty, setDirty] = useState(false),
@@ -135,13 +136,16 @@ export default function App() {
   function start(sample = false, to = "input", design?: Design) {
     if (!canReplace()) return;
     const next = sample ? sampleWorkspace() : emptyWorkspace();
+    openWorkspace(next, to, design);
+  }
+  function openWorkspace(next: Workspace, to: string, design?: Design) {
     if (design) next.design = structuredClone(design);
     if (to === "result") {
       const r = aggregate(next);
       next.design.cards = recommendedCards(r);
       next.report = {
         generated: draft(r),
-        notes: "",
+        notes: next.report.notes,
         basisKey: r.key,
         reviewedKey: "",
       };
@@ -151,10 +155,24 @@ export default function App() {
     setOriginalMeta([]);
     setWorkId("");
     setRevision(0);
-    setDirty(sample);
+    setDirty(next.sample);
+    setSampleListOpen(false);
     setSharedId("");
     setSharedResult(null);
     navigate(to);
+  }
+  async function startLargeSample() {
+    if (!canReplace()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { largeSampleWorkspace } = await import("../shared/sample-large");
+      openWorkspace(largeSampleWorkspace(), "result");
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setBusy(false);
+    }
   }
   async function loadSaved() {
     if (!user) {
@@ -267,8 +285,13 @@ export default function App() {
     } else void openShared(id);
   }, [accountReady, user?.id]);
   async function beginShare() {
-    if (w.report.basisKey !== result.key || w.report.reviewedKey !== result.key) {
-      setError("공유 전에 ‘최종 확인·내보내기’에서 현재 수치와 보고 문장을 확인해 주세요. 파일을 내려받을 필요는 없어요.");
+    if (
+      w.report.basisKey !== result.key ||
+      w.report.reviewedKey !== result.key
+    ) {
+      setError(
+        "공유 전에 ‘최종 확인·내보내기’에서 현재 수치와 보고 문장을 확인해 주세요. 파일을 내려받을 필요는 없어요.",
+      );
       return;
     }
     if (!user) {
@@ -566,6 +589,12 @@ export default function App() {
                       <FlaskConical size={17} />
                       샘플로 체험하기
                     </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSampleListOpen(true)}
+                    >
+                      샘플 목록
+                    </Button>
                   </div>
                   <div className="tool-foot">
                     <ShieldCheck size={15} />
@@ -640,6 +669,7 @@ export default function App() {
               setOriginals={setOriginals}
               onNext={() => navigate("verify")}
               onSample={() => start(true, "verify")}
+              onSampleList={() => setSampleListOpen(true)}
             />
           )}
           {route === "verify" && (
@@ -869,6 +899,43 @@ export default function App() {
             <LogOut size={17} />
             로그아웃
           </Button>
+        </Modal>
+      )}
+      {sampleListOpen && (
+        <Modal
+          title="샘플 데이터 선택"
+          onClose={() => !busy && setSampleListOpen(false)}
+        >
+          <p>가상 데이터로 업로드 없이 대시보드와 보고서를 체험해요.</p>
+          {error && <Notice tone="error">{error}</Notice>}
+          <div className="stack">
+            <section className="panel compact">
+              <h3>기본 샘플 · 48명 이력</h3>
+              <p>2026년 1~9월 · 5개 부서 · 기본 기능을 빠르게 확인해요.</p>
+              <Button disabled={busy} onClick={() => start(true, "result")}>
+                기본 샘플 열기
+              </Button>
+            </section>
+            <section className="panel compact sample-panel">
+              <span className="tag">사용자 제공 가상 데이터</span>
+              <h3>150명·24개월 인사 데이터</h3>
+              <p>
+                2024년 10월~2026년 9월 · 최종 재직 150명 · 전체 이력 180명 · 7개
+                부서
+              </p>
+              <p className="small">
+                인원·입퇴사, 근무·휴가, 제공 인건비를 함께 살펴보세요. 원본의
+                이름·생년월일은 샘플에 포함하지 않았어요.
+              </p>
+              <Notice>
+                이 파일의 기준대로 퇴사일은 제외해요. 부서 필터는 최종 관측 소속
+                기준이며 과거 부서 이동 분석은 포함하지 않아요.
+              </Notice>
+              <Button variant="primary" busy={busy} onClick={startLargeSample}>
+                150명·24개월 샘플 열기
+              </Button>
+            </section>
+          </div>
         </Modal>
       )}
       {requestOpen && <RequestModal onClose={() => setRequestOpen(false)} />}

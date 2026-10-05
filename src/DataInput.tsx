@@ -23,6 +23,7 @@ type Props = {
   setOriginals: (v: Original[]) => void;
   onNext: () => void;
   onSample: () => void;
+  onSampleList: () => void;
 };
 export function DataInput({
   w,
@@ -31,6 +32,7 @@ export function DataInput({
   setOriginals,
   onNext,
   onSample,
+  onSampleList,
 }: Props) {
   const [sheets, setSheets] = useState<RawSheet[]>([]),
     [busy, setBusy] = useState(false),
@@ -192,6 +194,9 @@ export function DataInput({
             <p>가상 인사·근태·지급 자료로 모든 단계를 체험해 보세요.</p>
             <Button onClick={onSample}>
               샘플 데이터 선택 <ArrowRight size={16} />
+            </Button>
+            <Button variant="ghost" onClick={onSampleList}>
+              다른 샘플 보기
             </Button>
             <small>샘플도 업로드 파일과 같은 집계 과정을 거쳐요.</small>
           </section>

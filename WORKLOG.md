@@ -301,3 +301,13 @@
 - 계정·업로드·분석 DB·검증 파일은 .gitignore에 제외했다. 외부 AI·GitHub push·배포 없음.
 - 별도 데이터 작업이 추가한 outputs/hrbip-synthetic-20261005와 scripts/hr_data는 수정하지 않았다.
 - 이후 수정 기준: docs/IMPLEMENTATION.md, METRICS.md, DECISIONS.md, OPERATIONS.md, VALIDATION.md.
+
+## 2026-10-05 — XLSX 읽기 오류 수정과 큰 샘플 추가
+
+- 사용자가 `Cannot read properties of undefined (reading 'sheets')` 오류를 제보했다. 제공 가상 XLSX로 동일한 ExcelJS 오류를 재현했다.
+- 접두사 있는 XML, 시트 내부 표 절대 관계 경로, BOM, ISO 날짜 셀을 읽기용 복사본에서 호환 처리했다. 날짜가 1905년으로 오해되는 경우도 회귀 테스트에 포함했다.
+- 사용자가 바탕화면의 HRBIP_가상인사데이터_v1.xlsx를 샘플 목록에 넣도록 선택했다. 작은 기본 샘플은 유지했다.
+- 원본을 수정하지 않고 이름·생년월일을 제외한 가상 자료를 지연 로딩 샘플로 추가했다. 원본과 웹 업로드의 6개 시트·날짜·파일 해시를 확인했다.
+- 퇴사일 제외, 비용 귀속월, 최종 관측 부서 분류를 명시했다. 총액·세부 항목 이중 합산을 피하고 전체 24개월을 독립 원본 집계와 대조한다.
+- 사용 방법과 제한은 docs/SAMPLES.md에 기록했다. 기존 outputs·scripts/hr_data 산출물은 수정하지 않았다.
+- 최종 빌드, 코드 테스트 20개, 브라우저 시나리오 11개 통과. v0.1.1로 기록했다.
