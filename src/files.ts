@@ -78,7 +78,17 @@ export async function parseFile(
     inspectZip(buffer);
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer);
+    const { compatibleXlsx } = await import("./xlsx-compat");
+    try {
+      await wb.xlsx.load(await compatibleXlsx(buffer));
+    } catch {
+      throw new Error(
+        file.name +
+          ": Excel 문서를 읽지 못했어요. 암호가 없는 XLSX인지 확인하고, Excel에서 새 XLSX로 저장한 뒤 다시 올려 주세요. CSV로 저장해서 올릴 수도 있어요.",
+      );
+    }
+    if (!wb.worksheets.length)
+      throw new Error(file.name + ": 읽을 수 있는 시트가 없습니다.");
     matrices = wb.worksheets.map((s) => {
       if (s.rowCount > 10050 || s.columnCount > 100)
         throw new Error("시트당 10,000개 데이터행·100열까지 지원합니다.");

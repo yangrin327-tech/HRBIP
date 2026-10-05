@@ -1,6 +1,6 @@
 {
   "name": "hrbip",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -20,6 +20,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "papaparse": "^5.5.3",
     "playwright": "^1.56.0",
