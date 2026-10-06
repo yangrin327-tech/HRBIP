@@ -3,6 +3,8 @@ import pptxgen from "pptxgenjs";
 import { chromium } from "playwright";
 import { aggregate, effectiveCards, formatValue } from "../shared/analytics";
 import { parseDate } from "../shared/import";
+import { verifyCalculations, sharedVerification } from "../shared/verification";
+import { addVerificationSheets } from "./verification-export";
 import {
   type Workspace,
   type Result,
@@ -23,6 +25,10 @@ const palette = {
   lime: ["527A1D", "92BA4B", "547F9A"],
 };
 export function assertExportable(w: Workspace, r = aggregate(w)) {
+  if (verifyCalculations(w, r).blocked)
+    throw new Error(
+      "계산 대조 결과가 일치하지 않아 내보내기를 중단했습니다. 계산 검증표를 확인하세요.",
+    );
   if (!Object.values(r.available).some(Boolean))
     throw new Error(
       "계산 가능한 분석 영역이 없습니다. 데이터와 집계 기준을 확인하세요.",
@@ -40,7 +46,11 @@ function pointRows(c: Chart) {
     ...(c.series.length > 1 ? [formatValue(p.value2 ?? null, c.unit)] : []),
   ]);
 }
-export async function exportExcel(w: Workspace, r = aggregate(w)) {
+export async function exportExcel(
+  w: Workspace,
+  r = aggregate(w),
+  shared = false,
+) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "HRBIP";
   wb.created = new Date();
@@ -112,6 +122,11 @@ export async function exportExcel(w: Workspace, r = aggregate(w)) {
             );
     });
   });
+  const verification = verifyCalculations(w, r);
+  addVerificationSheets(
+    wb,
+    shared ? sharedVerification(verification) : verification,
+  );
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 function wrap(text: string, max = 65) {
@@ -786,11 +801,12 @@ export async function exportFile(
   format: string,
   w: Workspace,
   r = aggregate(w),
+  shared = false,
 ) {
   assertExportable(w, r);
   switch (format) {
     case "xlsx":
-      return exportExcel(w, r);
+      return exportExcel(w, r, shared);
     case "pptx":
       return exportPptx(w, r);
     case "pdf":

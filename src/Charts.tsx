@@ -25,13 +25,17 @@ export function DataChart({
   card,
   theme,
   onSelect,
+  brand,
 }: {
   chart: Chart;
   card: Card;
   theme: Design["theme"];
   onSelect?: (value: string) => void;
+  brand?: Design["brand"];
 }) {
-  const colors = themes[theme],
+  const colors = brand
+      ? [brand.color, ...themes[theme].slice(1)]
+      : themes[theme],
     data = chart.points,
     select = (entry: any) => {
       const label = entry?.payload?.label ?? entry?.label;

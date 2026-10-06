@@ -20,6 +20,16 @@ import {
   endSession,
 } from "./auth";
 import { exportFile } from "./export";
+import { bindingSchema, type CompanyFormat } from "../shared/company-format";
+import {
+  inspectCompanyFormat,
+  sanitizeCompanyFormat,
+  applyCompanyFormat,
+} from "./company-format";
+import { verifyCalculations } from "../shared/verification";
+import { exportVerification } from "./verification-export";
+import { FormatError } from "./office-xml";
+import { verifyOfficeOutput } from "./verify-output";
 
 class HttpError extends Error {
   constructor(
@@ -149,6 +159,141 @@ export function createApp(
       w: workspaceSchema.parse(JSON.parse(String(row.payload))),
     };
   };
+  const getFormat = (id: string, owner: string) => {
+    const row = db
+      .prepare("SELECT * FROM company_formats WHERE id=? AND owner=?")
+      .get(id, owner);
+    if (!row)
+      throw new HttpError(
+        403,
+        "회사 양식이 삭제되었거나 접근 권한이 없습니다. 양식을 다시 선택하세요.",
+      );
+    return {
+      data: Buffer.from(row.data as Uint8Array),
+      meta: JSON.parse(String(row.payload)) as CompanyFormat,
+    };
+  };
+  const checkFormats = (w: Workspace, owner: string) => {
+    for (const [kind, id] of Object.entries(w.companyFormats || {}))
+      if (id && getFormat(id, owner).meta.format !== kind)
+        throw new HttpError(400, "양식 파일 형식이 맞지 않습니다.");
+  };
+  const formatUpload = z.object({
+    name: z.string().min(1).max(200),
+    data: z.string().max(14000000),
+  });
+  app.post("/api/company-formats/inspect", async (req, res) => {
+    const body = formatUpload.parse(req.body);
+    res.json(await inspectCompanyFormat(Buffer.from(body.data, "base64")));
+  });
+  app.get("/api/company-formats", (req, res) => {
+    const u = auth(req);
+    res.json(
+      db
+        .prepare(
+          "SELECT payload FROM company_formats WHERE owner=? ORDER BY created DESC",
+        )
+        .all(u.id)
+        .map((row) => JSON.parse(String(row.payload))),
+    );
+  });
+  app.post("/api/company-formats", async (req, res) => {
+    const u = auth(req),
+      body = formatUpload
+        .extend({
+          title: z.string().trim().min(1).max(160),
+          bindings: z.array(bindingSchema).max(700),
+          confirmed: z.literal(true),
+          previousId: z.string().uuid().optional(),
+          brand: z.object({
+            font: z.string().min(1).max(100),
+            color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+          }),
+        })
+        .parse(req.body);
+    const previous = body.previousId ? getFormat(body.previousId, u.id) : null;
+    const cleaned = await sanitizeCompanyFormat(
+      Buffer.from(body.data, "base64"),
+      body.bindings,
+    );
+    if (previous && previous.meta.format !== cleaned.inspection.format)
+      throw new HttpError(400, "새 버전은 같은 파일 형식으로 등록하세요.");
+    const safeInspection = {
+      ...cleaned.inspection,
+      slots: cleaned.inspection.slots.map((s) => ({
+        ...s,
+        sample:
+          body.bindings.find((b) => b.slot === s.id)?.field === "keep"
+            ? s.sample
+            : "",
+        suggestion: body.bindings.find((b) => b.slot === s.id)?.field || "",
+      })),
+    };
+    const meta: CompanyFormat = {
+      id: randomUUID(),
+      title: body.title,
+      format: cleaned.inspection.format,
+      version: previous ? previous.meta.version + 1 : 1,
+      created: new Date().toISOString(),
+      inspection: safeInspection,
+      bindings: body.bindings,
+      brand: body.brand,
+    };
+    db.prepare("INSERT INTO company_formats VALUES(?,?,?,?,?,?,?,?)").run(
+      meta.id,
+      u.id,
+      meta.title,
+      meta.format,
+      meta.version,
+      meta.created,
+      JSON.stringify(meta),
+      cleaned.data,
+    );
+    res.status(201).json(meta);
+  });
+  app.delete("/api/company-formats/:id", (req, res) => {
+    const u = auth(req),
+      id = String(req.params.id);
+    getFormat(id, u.id);
+    const used = db
+      .prepare("SELECT title,payload FROM works WHERE owner=?")
+      .all(u.id)
+      .some((row) =>
+        Object.values(
+          JSON.parse(String(row.payload)).companyFormats || {},
+        ).includes(id),
+      );
+    if (used)
+      throw new HttpError(
+        409,
+        "저장한 작업에서 사용 중인 양식입니다. 해당 작업의 양식을 해제하고 저장한 뒤 삭제하세요.",
+      );
+    db.prepare("DELETE FROM company_formats WHERE id=? AND owner=?").run(
+      id,
+      u.id,
+    );
+    res.json({ ok: true });
+  });
+  app.post("/api/verification", (req, res) => {
+    const w = workspaceSchema.parse(req.body.workspace);
+    res.json(verifyCalculations(w, aggregate(w)));
+  });
+  app.post("/api/verification/download", async (req, res) => {
+    const w = workspaceSchema.parse(req.body.workspace);
+    res.type("xlsx").send(await exportVerification(w, aggregate(w)));
+  });
+  app.post("/api/works/:id/verification", (req, res) => {
+    const { w, owner } = getWork(req, String(req.params.id));
+    if (req.body.filters) w.filters = filtersSchema.parse(req.body.filters);
+    const v = verifyCalculations(w, aggregate(w));
+    if (!owner) {
+      v.sources = [];
+      v.checks = v.checks.filter((c) => !c.id.startsWith("source:"));
+      v.counts = { pass: 0, attention: 0, fail: 0, unavailable: 0 };
+      v.checks.forEach((c) => v.counts[c.status]++);
+    }
+    res.json(v);
+  });
   app.get("/api/health", (_req, res) =>
     res.json({ ok: true, reportProvider: "rules", storage: "local" }),
   );
@@ -242,6 +387,7 @@ export function createApp(
         })
         .parse(req.body);
     const w = cleanWorkspace(body.workspace);
+    checkFormats(w, u.id);
     if (w.datasets.reduce((n, d) => n + d.rows.length, 0) > 30000)
       throw new HttpError(413, "전체 30,000행까지 저장할 수 있습니다.");
     const existing = body.id ? getWork(req, body.id, true) : null;
@@ -322,6 +468,7 @@ export function createApp(
       exitInclusive: w.exitInclusive,
       sample: w.sample,
       design: { ...w.design, cards: effectiveCards(w, result) },
+      companyFormats: w.companyFormats,
       report,
       owner,
     });
@@ -341,7 +488,10 @@ export function createApp(
       target = z.object({ userId: z.string().uuid() }).parse(req.body).userId;
     const result = aggregate(w);
     if (w.report.basisKey !== result.key || w.report.reviewedKey !== result.key)
-      throw new HttpError(422, "현재 보고서를 최종 확인한 뒤 공유 대상을 추가하세요.");
+      throw new HttpError(
+        422,
+        "현재 보고서를 최종 확인한 뒤 공유 대상을 추가하세요.",
+      );
     if (target === u.id) throw new HttpError(400, "본인은 이미 소유자입니다.");
     if (!db.prepare("SELECT 1 FROM users WHERE id=?").get(target))
       throw new HttpError(
@@ -421,12 +571,10 @@ export function createApp(
         body.message,
         new Date().toISOString(),
       );
-      res
-        .status(201)
-        .json({
-          id,
-          message: "이 PC의 요청함에 저장했습니다. 외부로 전송하지 않았습니다.",
-        });
+      res.status(201).json({
+        id,
+        message: "이 PC의 요청함에 저장했습니다. 외부로 전송하지 않았습니다.",
+      });
     },
   );
   const exportLimit = rateLimit({
@@ -435,7 +583,13 @@ export function createApp(
     message: { error: "출력이 많습니다. 1분 뒤 다시 시도해 주세요." },
   });
   let activeExports = 0;
-  const sendExport = async (res: Response, format: string, w: Workspace) => {
+  const sendExport = async (
+    res: Response,
+    format: string,
+    w: Workspace,
+    owner?: string,
+    shared = false,
+  ) => {
     if (activeExports >= 2)
       throw new HttpError(
         429,
@@ -456,7 +610,33 @@ export function createApp(
           422,
           "현재 수치와 보고 문장을 최종 확인한 뒤 내보내 주세요.",
         );
-      const file = await exportFile(format, w, r);
+      const verification = verifyCalculations(w, r);
+      if (verification.blocked)
+        throw new HttpError(
+          422,
+          "계산 검증에서 불일치가 발견되어 내보내기를 중단했습니다. 검증표를 확인하세요.",
+        );
+      const formatId = w.companyFormats?.[format as "pptx" | "xlsx"];
+      let file: Buffer, appliedMeta: CompanyFormat | undefined;
+      if (formatId) {
+        if (!owner)
+          throw new HttpError(
+            401,
+            "회사 양식 내보내기는 로그인 후 이용하세요.",
+          );
+        const saved = getFormat(formatId, owner);
+        appliedMeta = saved.meta;
+        const applied = await applyCompanyFormat(
+          saved.data,
+          saved.meta.inspection,
+          saved.meta.bindings,
+          w,
+          r,
+          saved.meta.brand,
+        );
+        file = applied.data;
+      } else file = await exportFile(format, w, r, shared);
+      await verifyOfficeOutput(format, file, w, r, appliedMeta);
       res.type(
         format === "pdf"
           ? "application/pdf"
@@ -476,10 +656,15 @@ export function createApp(
   };
   app.post("/api/export/:format", exportLimit, async (req, res) => {
     const w = workspaceSchema.parse(req.body.workspace);
-    await sendExport(res, String(req.params.format), w);
+    await sendExport(
+      res,
+      String(req.params.format),
+      w,
+      currentUser(db, req)?.id,
+    );
   });
   app.post("/api/works/:id/export/:format", exportLimit, async (req, res) => {
-    const { w, owner } = getWork(req, String(req.params.id));
+    const { w, owner, row } = getWork(req, String(req.params.id));
     if (req.body.filters) w.filters = filtersSchema.parse(req.body.filters);
     const result = aggregate(w);
     if (!owner && w.report.basisKey !== result.key)
@@ -489,7 +674,13 @@ export function createApp(
         basisKey: result.key,
         reviewedKey: result.key,
       };
-    await sendExport(res, String(req.params.format), w);
+    await sendExport(
+      res,
+      String(req.params.format),
+      w,
+      String(row.owner),
+      !owner,
+    );
   });
   app.use("/api", (_req, _res, next) =>
     next(new HttpError(404, "요청한 기능을 찾지 못했습니다.")),
@@ -502,19 +693,21 @@ export function createApp(
       _next: express.NextFunction,
     ) => {
       if (err instanceof z.ZodError) {
-        res
-          .status(400)
-          .json({
-            error:
-              "입력 형식이 올바르지 않습니다. 필수 항목과 입력 길이를 확인하세요.",
-            details: err.issues
-              .slice(0, 6)
-              .map((i) => ({ path: i.path.join("."), message: i.message })),
-          });
+        res.status(400).json({
+          error:
+            "입력 형식이 올바르지 않습니다. 필수 항목과 입력 길이를 확인하세요.",
+          details: err.issues
+            .slice(0, 6)
+            .map((i) => ({ path: i.path.join("."), message: i.message })),
+        });
         return;
       }
       if (err instanceof HttpError) {
         res.status(err.status).json({ error: err.message });
+        return;
+      }
+      if (err instanceof FormatError) {
+        res.status(422).json({ error: err.message });
         return;
       }
       if (err instanceof SyntaxError) {
@@ -531,12 +724,10 @@ export function createApp(
         return;
       }
       // Do not log submitted HR rows, request bodies, passwords or session tokens.
-      res
-        .status(500)
-        .json({
-          error:
-            "작업을 완료하지 못했습니다. 입력 기준·최종 확인 또는 서버 실행 상태를 확인한 뒤 다시 시도하세요.",
-        });
+      res.status(500).json({
+        error:
+          "작업을 완료하지 못했습니다. 입력 기준·최종 확인 또는 서버 실행 상태를 확인한 뒤 다시 시도하세요.",
+      });
     },
   );
   return app;

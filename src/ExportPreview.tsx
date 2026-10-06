@@ -42,6 +42,13 @@ export function ExportPreview({
         </p>
       </div>
       <h3>1. 자료 범위와 주요 수치</h3>
+      {w.companyFormats?.[format as "pptx" | "xlsx"] && (
+        <p className="soft-box">
+          회사 양식에는 연결한 항목만 들어가요. 아래는 전체 분석 내용이며 회사
+          양식의 실제 페이지 배치가 아니에요. 양식 등록·적용 화면에서 연결을
+          확인하세요.
+        </p>
+      )}
       <p className="muted">
         보고 기간과 실제 자료 범위가 다를 수 있어요. 자료가 없는 시점은 0으로
         채우지 않아요.

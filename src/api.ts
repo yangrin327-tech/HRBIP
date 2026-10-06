@@ -14,7 +14,7 @@ export async function api<T = any>(
   const res = await fetch("/api" + path, {
     method,
     headers: method === "GET" ? {} : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
   });
   const data = await res.json();
   if (!res.ok)

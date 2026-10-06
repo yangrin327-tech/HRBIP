@@ -2321,3 +2321,140 @@ details[open] > summary::before {
     word-break: keep-all;
   }
 }
+/* Company formats and calculation checks share the existing readable controls. */
+.report-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  background: #f0f6ed;
+  border: 1px solid #d5e3ce;
+  border-radius: 18px;
+  margin: 16px 0 24px;
+}
+.report-tools p {
+  margin: 8px 0 0;
+  color: #465f50;
+}
+.report-tools strong {
+  font-size: 18px;
+}
+.format-library,
+.format-page {
+  margin: 24px 0;
+}
+.format-choice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+.format-choice select {
+  flex: 1;
+  min-width: 180px;
+}
+.format-choice label {
+  flex: 1;
+}
+.format-slots {
+  display: grid;
+  gap: 12px;
+}
+.format-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 0.7fr);
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid #dce5d9;
+  border-radius: 12px;
+}
+.format-slot small {
+  display: block;
+  margin-top: 6px;
+}
+.format-source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #52665b;
+  max-height: 130px;
+  overflow: auto;
+}
+.format-value {
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 15px;
+  background: #f2f7ef;
+  padding: 12px;
+  border-radius: 8px;
+}
+.verification-counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+.verification-counts > div {
+  padding: 18px;
+  border: 1px solid #dce5d9;
+  border-radius: 12px;
+}
+.verification-counts strong {
+  display: block;
+  font-size: 25px;
+  margin-top: 8px;
+}
+.verification-table {
+  max-height: 440px;
+  overflow: auto;
+  border: 1px solid #dce5d9;
+  border-radius: 10px;
+  margin: 18px 0;
+}
+.verification-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.verification-table th,
+.verification-table td {
+  padding: 13px;
+  text-align: left;
+  border-bottom: 1px solid #dce5d9;
+  vertical-align: top;
+  min-width: 95px;
+}
+.verification-table th:first-child {
+  min-width: 190px;
+}
+.verification-table td:last-child {
+  min-width: 270px;
+}
+.verification-table thead {
+  position: sticky;
+  top: 0;
+  background: #edf5e7;
+}
+@media (max-width: 700px) {
+  .report-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .report-tools .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .format-slot {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .verification-counts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .format-choice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

@@ -26,6 +26,8 @@ import { DataChart } from "./Charts";
 import { Button, Notice, PageTitle, Steps, Modal } from "./ui";
 import { MetricEvidence } from "./MetricEvidence";
 import { ExportPreview } from "./ExportPreview";
+import { CompanyFormats } from "./CompanyFormats";
+import { CalculationVerification } from "./CalculationVerification";
 export function Results({
   w,
   r,
@@ -39,6 +41,9 @@ export function Results({
   onBack,
   readOnly = false,
   busy = false,
+  loggedIn = false,
+  onLogin = () => {},
+  sharedId,
 }: {
   w: Workspace;
   r: Result;
@@ -52,7 +57,12 @@ export function Results({
   onBack: () => void;
   readOnly?: boolean;
   busy?: boolean;
+  loggedIn?: boolean;
+  onLogin?: () => void;
+  sharedId?: string;
 }) {
+  const [companyOpen, setCompanyOpen] = useState(false),
+    [verificationOpen, setVerificationOpen] = useState(false);
   const [baseFilters] = useState(w.filters);
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [tab, setTab] = useState("dashboard"),
@@ -95,7 +105,10 @@ export function Results({
     return chart && !chart.allowed.includes(c.type);
   });
   return (
-    <>
+    <div
+      className="branded-result"
+      style={{ fontFamily: w.design.brand?.font }}
+    >
       <PageTitle
         eyebrow={readOnly ? "SHARED REPORT" : "YOUR PEOPLE INSIGHTS"}
         title={w.title}
@@ -126,6 +139,27 @@ export function Results({
         }
       />
       {!readOnly && <Steps current={reviewed ? 3 : 2} />}
+      <section className="report-tools" aria-label="회사 양식과 계산 검증">
+        <div>
+          <strong>보고를 마무리하는 두 가지 도구</strong>
+          <p>
+            회사 양식으로 옮기는 수고와 숫자를 다시 계산하는 수고를 줄여보세요.
+          </p>
+        </div>
+        <div className="actions">
+          {!readOnly && (
+            <Button onClick={() => setCompanyOpen(true)}>
+              회사 양식 등록·적용
+              {Object.values(w.companyFormats || {}).some(Boolean)
+                ? " · 적용 중"
+                : ""}
+            </Button>
+          )}
+          <Button onClick={() => setVerificationOpen(true)}>
+            계산 검증·검증표
+          </Button>
+        </div>
+      </section>
       <section className="filter-bar" aria-label="대시보드 필터">
         <label>
           시작 월
@@ -310,6 +344,7 @@ export function Results({
                           chart={chart}
                           card={card}
                           theme={w.design.theme}
+                          brand={w.design.brand}
                           onSelect={
                             chart.filter
                               ? (value) => select(chart.id, value)
@@ -655,6 +690,15 @@ export function Results({
           wide
         >
           <p>대시보드와 보고서는 아래 집계 기준을 함께 사용해요.</p>
+          <Notice>
+            {w.companyFormats?.[format as "pptx" | "xlsx"]
+              ? "저장한 회사 양식에 연결한 항목으로 출력해요. 연결하지 않은 항목은 포함하지 않아요. 양식의 칸이 부족하면 수정할 위치를 안내해요."
+              : "HRBIP 기본 양식으로 출력해요."}{" "}
+            계산값은 서버에서 다시 대조하고 불일치가 있으면 다운로드를 중단해요.
+          </Notice>
+          <Button onClick={() => setVerificationOpen(true)}>
+            계산 검증표 먼저 확인
+          </Button>
           <div className="soft-box">
             {r.basis.map((b) => (
               <p key={b}>{b}</p>
@@ -741,6 +785,24 @@ export function Results({
           </div>
         </Modal>
       )}
-    </>
+      {companyOpen && (
+        <CompanyFormats
+          w={w}
+          r={r}
+          setW={setW}
+          loggedIn={loggedIn}
+          onLogin={onLogin}
+          onClose={() => setCompanyOpen(false)}
+        />
+      )}
+      {verificationOpen && (
+        <CalculationVerification
+          w={w}
+          r={r}
+          sharedId={sharedId}
+          onClose={() => setVerificationOpen(false)}
+        />
+      )}
+    </div>
   );
 }

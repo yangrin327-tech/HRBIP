@@ -289,6 +289,7 @@ export default function App() {
       next.title = data.title;
       next.filters = data.result.filters;
       next.design = data.design;
+      next.companyFormats = data.companyFormats;
       next.report = data.report;
       next.exitInclusive = data.exitInclusive;
       next.sample = data.sample;
@@ -748,6 +749,9 @@ export default function App() {
                 </div>
               )}
               <Results
+                loggedIn={!!user}
+                onLogin={() => setAuthOpen(true)}
+                sharedId={shared ? sharedId : undefined}
                 w={w}
                 r={result}
                 setW={setW}

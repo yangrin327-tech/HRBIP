@@ -29,6 +29,7 @@ export function prepareRepeat(source: Workspace): {
   };
   workspace.exitInclusive = source.exitInclusive;
   workspace.design = structuredClone(source.design);
+  workspace.companyFormats = structuredClone(source.companyFormats);
   audit(
     workspace,
     "새 자료 반복 보고 시작. 이전 행·보고 문장·필터·확인 상태·원본 보관 선택은 가져오지 않음.",

@@ -62,6 +62,12 @@ export const cardSchema = z.object({
 });
 export type Card = z.infer<typeof cardSchema>;
 export const designSchema = z.object({
+  brand: z
+    .object({
+      font: z.string().max(100),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    })
+    .optional(),
   theme: z.enum(["green", "forest", "lime"]),
   layout: z.enum(["balanced", "focus", "compact"]),
   cards: z.array(cardSchema).max(12),
@@ -75,6 +81,12 @@ export const reportSchema = z.object({
 });
 export type Report = z.infer<typeof reportSchema>;
 export const workspaceSchema = z.object({
+  companyFormats: z
+    .object({
+      pptx: z.string().uuid().optional(),
+      xlsx: z.string().uuid().optional(),
+    })
+    .optional(),
   version: z.literal(1),
   title: z.string().trim().min(1).max(160),
   datasets: z.array(datasetSchema).max(24),
