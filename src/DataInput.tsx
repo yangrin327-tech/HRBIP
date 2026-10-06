@@ -17,6 +17,7 @@ import {
 import { Button, Notice, PageTitle, Steps } from "./ui";
 import { SheetSetup } from "./SheetSetup";
 import { recognizeHrWorkbook, prepareHrWorkbook } from "./hr-workbook";
+import { useGuest } from "./guest";
 type Props = {
   w: Workspace;
   setW: (fn: (w: Workspace) => void) => void;
@@ -37,6 +38,7 @@ export function DataInput({
   onSampleList,
   repeating = false,
 }: Props) {
+  const guest = useGuest();
   const [sheets, setSheets] = useState<RawSheet[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -361,29 +363,54 @@ export function DataInput({
         <ShieldCheck />
         <div>
           <h3>원본은 보호하고, 필요한 자료만</h3>
-          <p>
-            파일 읽기와 확인은 브라우저 메모리에서 진행해요. 저장·내보내기를
-            요청할 때 필요한 자료를 현재 접속한 HRBIP 서버로 보내요. 큰 자료는
-            전송 중 임시 보관되며, 처리 완료 시 삭제돼요. 중단된 전송은 10분 후
-            접근이 차단되고 다음 전송 시작 시 정리돼요. 로그인 후 저장하면
-            연결한 분석 데이터는 보관되고, 파일 원본은 아래 선택에 따라 별도로
-            보관해요.
-          </p>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={w.retainOriginals}
-              onChange={(e) =>
-                setW((v) => {
-                  v.retainOriginals = e.target.checked;
-                })
-              }
-            />
-            저장할 때 업로드 원본 파일도 함께 보관하기
-          </label>
-          <small>
-            기본은 원본 미보관이에요. 저장하지 않고 탭을 닫으면 작업은 사라져요.
-          </small>
+          {guest.enabled ? (
+            <>
+              <p>
+                파일 읽기와 대시보드 분석은 브라우저 메모리에서 진행해요. 계산
+                검증·내보내기 시 분석 자료를, 회사 양식 검사·적용 시 양식 파일을
+                서버에 보내 일회성으로 처리해요. HRBIP 데이터베이스나 파일
+                저장소에는 보관하지 않아요.
+              </p>
+              <p>
+                작업과 양식 연결은 현재 탭에서만 유지돼요. 새로고침·탭 종료 전에
+                결과를 다운로드하세요. 포트폴리오 시연에는 가상·비식별 자료를
+                사용해 주세요. 호스팅 서비스의 접속·오류 로그는 별도이며, 실제
+                인사자료에 대한 보안·운영 검증은 완료하지 않았어요.
+              </p>
+              <small>
+                서버 전송은 압축 후 4MB, 압축 전 40MB까지 지원해요. 넘으면 자료
+                분할이나 양식 이미지 축소를 안내하며 임시 저장소로 우회하지
+                않아요.
+              </small>
+            </>
+          ) : (
+            <>
+              <p>
+                파일 읽기와 확인은 브라우저 메모리에서 진행해요. 저장·내보내기를
+                요청할 때 필요한 자료를 현재 접속한 HRBIP 서버로 보내요. 큰
+                자료는 전송 중 임시 보관되며, 처리 완료 시 삭제돼요. 중단된
+                전송은 10분 후 접근이 차단되고 다음 전송 시작 시 정리돼요.
+                로그인 후 저장하면 연결한 분석 데이터는 보관되고, 파일 원본은
+                아래 선택에 따라 별도로 보관해요.
+              </p>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={w.retainOriginals}
+                  onChange={(e) =>
+                    setW((v) => {
+                      v.retainOriginals = e.target.checked;
+                    })
+                  }
+                />
+                저장할 때 업로드 원본 파일도 함께 보관하기
+              </label>
+              <small>
+                기본은 원본 미보관이에요. 저장하지 않고 탭을 닫으면 작업은
+                사라져요.
+              </small>
+            </>
+          )}
         </div>
       </section>
       <div className="bottom-actions">

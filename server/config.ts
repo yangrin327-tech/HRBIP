@@ -21,6 +21,9 @@ export function serverConfig(env: NodeJS.ProcessEnv = process.env) {
       "APP_ORIGIN must be a full origin without a path or trailing slash.",
     );
   const publicDemo = env.PUBLIC_DEMO === "true";
+  // Public deployment is always account-free. Legacy local data remains available
+  // only when a developer deliberately opts in on a non-public server.
+  const guestMode = publicDemo || env.HRBIP_ACCOUNTS_ENABLED !== "true";
   if (
     publicDemo &&
     (parsed.protocol !== "https:" || env.COOKIE_SECURE !== "true")
@@ -28,11 +31,11 @@ export function serverConfig(env: NodeJS.ProcessEnv = process.env) {
     throw new Error(
       "Public deployment requires an HTTPS APP_ORIGIN and COOKIE_SECURE=true.",
     );
-  if (publicDemo && !env.DATA_DIR && !env.DATABASE_URL)
+  if (!guestMode && publicDemo && !env.DATA_DIR && !env.DATABASE_URL)
     throw new Error(
       "Public deployment requires DATABASE_URL or persistent DATA_DIR.",
     );
-  if (env.VERCEL && !env.DATABASE_URL)
+  if (!guestMode && env.VERCEL && !env.DATABASE_URL)
     throw new Error(
       "Vercel requires DATABASE_URL; its filesystem is not persistent storage.",
     );
@@ -50,6 +53,7 @@ export function serverConfig(env: NodeJS.ProcessEnv = process.env) {
     host: env.HOST || "127.0.0.1",
     origin,
     publicDemo,
+    guestMode,
     trustProxyHops,
   };
 }

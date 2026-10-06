@@ -1,4 +1,6 @@
 # HRBIP v0.1.1 검증 결과
+
+> 2026-10-06 로그인 없는 버전의 테스트와 배포 결과는 WORKLOG 최신 항목 및 [GUEST_MODE.md](GUEST_MODE.md)를 참조한다. 이 문서의 이전 계정/저장 검증 통과는 현재 공개 버전에 계정 기능이 있다는 뜻이 아니다.
 검증일: 2026-10-05. 가상 데이터만 사용. 실행 환경: Windows, Node 24.19.0, Chromium, Microsoft PowerPoint/Excel.
 
 ## 실제 통과

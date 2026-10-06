@@ -33,7 +33,8 @@ import {
 } from "../shared/model";
 import { aggregate, draft, recommendedCards } from "../shared/analytics";
 import { sampleWorkspace } from "../shared/sample";
-import { api, download, ApiError } from "./api";
+import { api, download, ApiError, setGuestRequests } from "./api";
+import { GuestContext, useGuest, type GuestFormat } from "./guest";
 import type { Original } from "./files";
 import { Button, Notice, Modal, PageTitle } from "./ui";
 import { DataInput } from "./DataInput";
@@ -63,6 +64,8 @@ export default function App() {
     [requestOpen, setRequestOpen] = useState(false);
   const [sampleListOpen, setSampleListOpen] = useState(false);
   const [publicDemo, setPublicDemo] = useState(false);
+  const [guestMode, setGuestMode] = useState(true);
+  const [guestFormats, setGuestFormats] = useState<GuestFormat[]>([]);
   const [returnToSaved, setReturnToSaved] = useState(false);
   const [reusePlan, setReusePlan] = useState<ReusePlan | null>(null);
   const [workId, setWorkId] = useState(""),
@@ -101,6 +104,9 @@ export default function App() {
       .then((data) => {
         setUser(data.user);
         setPublicDemo(!!data.publicDemo);
+        const guest = data.guestMode !== false;
+        setGuestMode(guest);
+        setGuestRequests(guest);
       })
       .catch(() =>
         setError(
@@ -130,7 +136,8 @@ export default function App() {
   }
   function handleError(e: unknown) {
     setError((e as Error).message);
-    if (e instanceof ApiError && e.status === 401) setAuthOpen(true);
+    if (!guestMode && e instanceof ApiError && e.status === 401)
+      setAuthOpen(true);
   }
   function canReplace() {
     return (
@@ -313,11 +320,17 @@ export default function App() {
     if (!accountReady) return;
     const id = new URLSearchParams(window.location.search).get("share");
     if (!id) return;
+    if (guestMode) {
+      setError(
+        "계정 공유를 사용하지 않는 버전이에요. 이전 공유 링크의 자료는 공개하지 않습니다. 파일이나 샘플로 새 작업을 시작하세요.",
+      );
+      return;
+    }
     if (!user) {
       setAuthOpen(true);
       setError("공유 자료는 지정된 계정으로 로그인해야 볼 수 있어요.");
     } else void openShared(id);
-  }, [accountReady, user?.id]);
+  }, [accountReady, user?.id, guestMode]);
   async function beginShare() {
     if (
       w.report.basisKey !== result.key ||
@@ -365,15 +378,25 @@ export default function App() {
     } else
       await download(
         "/export/" + format,
-        { workspace: w },
+        {
+          workspace: w,
+          companyFormat: guestMode
+            ? guestFormats.find(
+                (f) =>
+                  f.meta.id === w.companyFormats?.[format as "pptx" | "xlsx"],
+              )?.input
+            : undefined,
+        },
         w.title + "." + format,
       );
     notify(
       format.toUpperCase() +
         " 파일을 만들었어요." +
-        (!user
-          ? " 작업 목록에 남기려면 로그인 후 저장해 주세요."
-          : " 작업도 저장했어요."),
+        (guestMode
+          ? " 다운로드 폴더에서 확인하세요. 현재 작업은 서버에 저장되지 않아요."
+          : !user
+            ? " 작업 목록에 남기려면 로그인 후 저장해 주세요."
+            : " 작업도 저장했어요."),
     );
   }
   function createResult() {
@@ -416,780 +439,820 @@ export default function App() {
   }
   const shared = route === "shared";
   return (
-    <div className="app-shell">
-      <a className="skip-link" href="#main">
-        본문으로 건너뛰기
-      </a>
-      <header className="topbar">
-        <button
-          className="brand"
-          onClick={() => navigate("home")}
-          aria-label="HRBIP 홈"
-        >
-          <span className="brand-mark">
-            <BarChart3 size={23} />
-          </span>
-          <span>
-            HRBIP<small>HR Business Intelligence Partner</small>
-          </span>
-        </button>
-        <div className="account-nav">
-          {user ? (
-            <Button onClick={() => setAccountOpen(true)}>
-              <span className="avatar">{user.username[0].toUpperCase()}</span>
-              {user.username}
-            </Button>
-          ) : (
-            <Button onClick={() => setAuthOpen(true)}>
-              <LogIn size={17} />
-              로그인
-            </Button>
-          )}
-        </div>
-      </header>
-      <div className="workspace">
-        <aside className="sidebar">
-          <div className="sidebar-label">WORKSPACE</div>
-          <nav className="workspace-nav" aria-label="워크스페이스">
-            <button
-              className={route === "home" ? "selected" : ""}
-              onClick={() => navigate("home")}
-            >
-              <Grid2X2 size={19} />
-              모든 도구
-            </button>
-            <button
-              className={
-                ["input", "repeat", "verify", "result"].includes(route)
-                  ? "selected"
-                  : ""
-              }
-              onClick={() =>
-                ["input", "repeat", "verify"].includes(route)
-                  ? navigate(route)
-                  : w.datasets.length && !shared
-                    ? navigate("result")
-                    : start()
-              }
-            >
-              <BarChart3 size={19} />
-              인사현황 보고서
-            </button>
-            <button
-              className={route === "saved" ? "selected" : ""}
-              onClick={loadSaved}
-            >
-              <FolderOpen size={19} />
-              저장한 작업
-            </button>
-          </nav>
-          <div className="sidebar-bottom">
-            <span className="round-icon">
-              <Leaf size={20} />
+    <GuestContext.Provider
+      value={{
+        enabled: guestMode,
+        formats: guestFormats,
+        setFormats: setGuestFormats,
+      }}
+    >
+      <div className="app-shell">
+        <a className="skip-link" href="#main">
+          본문으로 건너뛰기
+        </a>
+        <header className="topbar">
+          <button
+            className="brand"
+            onClick={() => navigate("home")}
+            aria-label="HRBIP 홈"
+          >
+            <span className="brand-mark">
+              <BarChart3 size={23} />
             </span>
-            <strong>
-              반복은 줄이고,
-              <br />
-              사람에게 집중하세요.
-            </strong>
-            <p>
-              인사 업무를 위한
-              <br />
-              작은 도구부터 함께.
-            </p>
-            <button onClick={() => setRequestOpen(true)}>
-              기능 제안하기 <ArrowUpRight size={16} />
-            </button>
-          </div>
-        </aside>
-        <main id="main" tabIndex={-1}>
-          <div className="breadcrumb">
-            워크스페이스 <ChevronRight size={13} />{" "}
-            {route === "home"
-              ? "모든 도구"
-              : route === "saved"
-                ? "저장한 작업"
-                : shared
-                  ? "공유 보고서"
-                  : "인사현황 보고서·대시보드"}
-          </div>
-          {publicDemo && (
-            <Notice>
-              포트폴리오 체험용 공개 버전이에요. 가상 데이터로 이용해 주세요.
-              저장한 작업은 온라인 HRBIP 저장소에 보관되며, 내 컴퓨터에서 만든
-              계정·작업과는 별개예요. 실제 인사자료를 위한 보안·운영 검증은 아직
-              완료하지 않았어요.
-            </Notice>
-          )}
-          {error && (
-            <Notice tone="error">
-              {error}
-              <Button variant="ghost" onClick={() => setError("")}>
-                닫기
-              </Button>
-              {error.includes("다른 화면") && (
-                <Button onClick={() => save(true)}>새 작업으로 저장</Button>
-              )}
-            </Notice>
-          )}
-          {status && (
-            <div className="toast" role="status">
-              <Check size={18} />
-              {status}
-            </div>
-          )}
-          {busy && (
-            <div className="loading-line" role="status">
-              작업을 처리하고 있어요…
-            </div>
-          )}
-          {route === "home" && (
-            <>
-              <section className="home-intro">
-                <div>
-                  <div className="eyebrow">
-                    <span className="tiny-dot" />
-                    YOUR HR WORK PARTNER
-                  </div>
-                  <h1 className="hero-brand">HRBIP</h1>
-                  <div className="hero-brand-name">
-                    HR Business Intelligence Partner
-                  </div>
-                  <h2 className="hero-message">
-                    기존 인사 자료에서,
-                    <br />
-                    검토 가능한 보고서까지.
-                  </h2>
-                  <p>
-                    인사 시스템에서 내려받은 파일과 엑셀을 연결하세요.
-                    <br />
-                    숫자의 기준을 확인하고, 차트와 문서를 편집해 보고에
-                    활용하세요.
-                  </p>
-                  <div className="hero-actions">
-                    <Button variant="primary" onClick={() => start()}>
-                      보고서 만들기 <ArrowRight size={22} />
-                    </Button>
-                    <Button onClick={() => setSampleListOpen(true)}>
-                      샘플로 먼저 보기
-                    </Button>
-                  </div>
-                </div>
-                <div className="intro-illustration" aria-hidden="true">
-                  <div className="paper back" />
-                  <div className="paper front">
-                    <div className="illus-label">
-                      <span>PEOPLE INSIGHTS</span>
-                      <BarChart3 size={18} />
-                    </div>
-                    <div className="illus-title">
-                      우리 조직을 이해하는
-                      <br />더 명확한 시선.
-                    </div>
-                    <div className="illus-bars">
-                      {[40, 65, 52, 86, 72, 96].map((n, i) => (
-                        <i key={i} style={{ height: n + "%" }} />
-                      ))}
-                    </div>
-                    <span className="illus-footer">
-                      DATA → INSIGHT → ACTION
-                    </span>
-                  </div>
-                  <div className="floating-badge">
-                    <CheckCircle />
-                    자료에서 보고서까지
-                  </div>
-                </div>
-              </section>
-              <section className="tools-heading">
-                <div>
-                  <span className="eyebrow">TOOLS FOR YOUR WORK</span>
-                  <h2>오늘의 업무, 여기서 시작해요.</h2>
-                </div>
-                <span className="count-pill">사용 가능한 도구 1</span>
-              </section>
-              <div className="home-tools">
-                <article className="featured-tool">
-                  <div className="tool-top">
-                    <span className="tool-icon">
-                      <BarChart3 size={26} />
-                    </span>
-                    <span className="tag">첫 번째 도구</span>
-                  </div>
-                  <h2>
-                    인사현황 보고서·
-                    <br />
-                    대시보드 만들기
-                  </h2>
-                  <p>
-                    기존 인사 파일을 연결하면, 보유한 자료에 맞춰
-                    <br className="desktop-only" />
-                    추천 대시보드와 수정 가능한 보고서 초안을 만들어요.
-                  </p>
-                  <div className="feature-chips">
-                    <span>인원·입퇴사</span>
-                    <span>근태·휴가</span>
-                    <span>인건비</span>
-                  </div>
-                  <div className="tool-actions">
-                    <Button variant="primary" onClick={() => start()}>
-                      내 자료로 시작하기 <ArrowRight size={18} />
-                    </Button>
-                    <Button onClick={() => start(true, "result")}>
-                      <FlaskConical size={17} />
-                      샘플로 체험하기
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSampleListOpen(true)}
-                    >
-                      샘플 목록
-                    </Button>
-                  </div>
-                  <div className="tool-foot">
-                    <ShieldCheck size={15} />
-                    원본을 보호하고, 확인한 기준으로 집계해요.
-                  </div>
-                </article>
-                <div className="stack">
-                  <article className="panel how-to">
-                    <h3>복잡한 설정 없이, 한 단계씩.</h3>
-                    {[
-                      [
-                        "01",
-                        "입력 · 기존 자료를 연결해요",
-                        "필요한 항목과 파일 구조를 먼저 확인하고 CSV·Excel을 가져오세요.",
-                      ],
-                      [
-                        "02",
-                        "확인 · 숫자의 근거를 검토해요",
-                        "누락·중복·기간과 계산 기준을 확인해요. 없는 자료는 추정하지 않아요.",
-                      ],
-                      [
-                        "03",
-                        "출력 · 보고할 자료를 완성해요",
-                        "문장과 차트를 미리 보고 PDF·PPT·Excel로 출력하세요. 다음 보고는 저장한 설정으로 시작해요.",
-                      ],
-                    ].map(([n, t, d]) => (
-                      <div className="how-step" key={n}>
-                        <span>{n}</span>
-                        <div>
-                          <strong>{t}</strong>
-                          <p>{d}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </article>
-                  <article className="coming-soon">
-                    <div>
-                      <span className="tag muted-tag">확장 예정</span>
-                      <h3>다음 도구는, 실제 필요에서.</h3>
-                      <p>반복해서 하는 인사 업무가 있나요?</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      aria-label="원하는 기능 요청"
-                      onClick={() => setRequestOpen(true)}
-                    >
-                      <Plus size={23} />
-                    </Button>
-                  </article>
-                </div>
-              </div>
-              <section className="request-banner">
-                <MessageSquarePlus size={26} />
-                <div>
-                  <h3>“이런 기능도 있으면 좋겠어요.”</h3>
-                  <p>
-                    원하는 기능이 있으면 요청해보세요. 다음 개선의 출발점이
-                    돼요.
-                  </p>
-                </div>
-                <Button onClick={() => setRequestOpen(true)}>
-                  기능 요청하기 <ArrowUpRight size={16} />
-                </Button>
-              </section>
-            </>
-          )}
-          {route === "input" && (
-            <DataInput
-              w={w}
-              setW={setW}
-              originals={originals}
-              setOriginals={setOriginals}
-              repeating={!!reusePlan}
-              onNext={() => navigate(reusePlan ? "repeat" : "verify")}
-              onSample={() => start(true, "verify")}
-              onSampleList={() => setSampleListOpen(true)}
-            />
-          )}
-          {route === "repeat" && reusePlan && (
-            <RepeatReview
-              w={w}
-              plan={reusePlan}
-              setW={setW}
-              onNext={() => navigate("verify")}
-              onBack={() => navigate("input")}
-            />
-          )}
-          {route === "verify" && (
-            <DataReview
-              w={w}
-              setW={setW}
-              onBack={() => navigate("input")}
-              onNext={createResult}
-            />
-          )}
-          {(route === "result" || shared) && (
-            <>
-              {!shared && (
-                <div className="save-state" role="status">
-                  <strong>
-                    {workId
-                      ? dirty
-                        ? "저장 후 변경사항이 있어요"
-                        : "저장한 작업이에요"
-                      : "아직 저장하지 않은 작업이에요"}
-                  </strong>
-                  <span>
-                    {workId && !dirty
-                      ? "워크스페이스의 ‘저장한 작업’에서 다시 열 수 있어요."
-                      : !user
-                        ? "로그인 후 저장하면 다음 방문에도 이어서 볼 수 있어요. 파일 다운로드만으로는 작업 목록에 남지 않아요."
-                        : "보고서의 저장 버튼으로 현재 데이터와 편집 내용을 작업 목록에 남겨주세요."}
-                  </span>
-                </div>
-              )}
-              <Results
-                loggedIn={!!user}
-                onLogin={() => setAuthOpen(true)}
-                sharedId={shared ? sharedId : undefined}
-                w={w}
-                r={result}
-                setW={setW}
-                onFilters={(f) => {
-                  if (shared) void openShared(sharedId, f);
-                  else
-                    setW((v) => {
-                      v.filters = f;
-                    });
-                }}
-                onSave={() => save()}
-                onRepeat={() => {
-                  if (canReplace()) repeatWorkspace(w);
-                }}
-                onTemplate={() => {
-                  if (!user) {
-                    setAuthOpen(true);
-                    return;
-                  }
-                  setTemplateTitle(w.title + " 구성");
-                  setTemplateOpen(true);
-                }}
-                onShare={beginShare}
-                onExport={exportCurrent}
-                onBack={() => navigate("verify")}
-                readOnly={shared}
-                busy={busy}
-              />
-            </>
-          )}
-          {route === "saved" && (
-            <>
-              <PageTitle
-                eyebrow="SAVED WORKSPACE"
-                title="이어서, 더 가볍게."
-                description="저장한 작업을 다시 열거나, 익숙한 구성에 새로운 자료를 적용하세요."
-                actions={
-                  <Button variant="primary" onClick={() => start()}>
-                    <Plus size={17} />새 작업
-                  </Button>
-                }
-              />
-              <section className="panel">
-                <div className="section-heading">
-                  <h2>저장한 작업·공유받은 보고서</h2>
-                  <span className="tag">{stored.length}</span>
-                </div>
-                {!stored.length ? (
-                  <div className="empty-state">
-                    <FolderOpen size={35} />
-                    <h3>아직 저장한 작업이 없어요.</h3>
-                    <p>보고서를 만든 뒤 저장하면 이곳에서 다시 열 수 있어요.</p>
-                    <Button onClick={() => start(true, "result")}>
-                      샘플로 시작하기
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="saved-list">
-                    {stored.map((item) => (
-                      <article key={item.id}>
-                        <span className="file-icon">
-                          <FileSpreadsheet size={23} />
-                        </span>
-                        <div>
-                          <h3>{item.title}</h3>
-                          <p>
-                            {item.owned ? "내 작업" : "공유받은 작업"} ·{" "}
-                            {new Date(item.updated).toLocaleString("ko-KR")}
-                          </p>
-                          <small>
-                            공유 {item.sharedCount}개 계정 · 원본{" "}
-                            {item.originalCount
-                              ? "보관 " + item.originalCount + "개"
-                              : "미보관"}{" "}
-                            · 분석 데이터 저장됨
-                          </small>
-                        </div>
-                        <div className="actions">
-                          <Button onClick={() => openWork(item)}>
-                            열기 <ArrowRight size={15} />
-                          </Button>
-                          {!!item.owned && (
-                            <Button
-                              onClick={() => repeatStored(item)}
-                              busy={busy}
-                            >
-                              새 자료로 반복 보고
-                            </Button>
-                          )}
-                          {!!item.owned && (
-                            <Button
-                              variant="ghost"
-                              aria-label={item.title + " 삭제"}
-                              onClick={async () => {
-                                if (
-                                  !confirm(
-                                    "작업·분석 데이터·보관 원본·공유 권한을 삭제할까요? 되돌릴 수 없습니다.",
-                                  )
-                                )
-                                  return;
-                                try {
-                                  await api("/works/" + item.id, "DELETE", {});
-                                  if (workId === item.id) {
-                                    setWorkId("");
-                                    setRevision(0);
-                                  }
-                                  await loadSaved();
-                                } catch (e) {
-                                  handleError(e);
-                                }
-                              }}
-                            >
-                              <Trash2 size={17} />
-                            </Button>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-              <section className="panel">
-                <div className="section-heading">
-                  <h2>내 템플릿</h2>
-                  <span className="tag">{templates.length}</span>
-                </div>
-                <p className="muted">
-                  차트·제목·배치·색상만 저장해요. 이전 직원 정보와 수치는
-                  포함되지 않아요.
-                </p>
-                {templates.length ? (
-                  <div className="template-grid">
-                    {templates.map((t) => (
-                      <article key={t.id}>
-                        <Settings2 size={21} />
-                        <h3>{t.title}</h3>
-                        <p>구성 카드 {t.design.cards.length}개</p>
-                        <div className="actions">
-                          <Button
-                            onClick={() => start(false, "input", t.design)}
-                          >
-                            새 데이터 적용
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            aria-label={t.title + " 템플릿 삭제"}
-                            onClick={async () => {
-                              if (confirm("이 템플릿을 삭제할까요?"))
-                                try {
-                                  await api("/templates/" + t.id, "DELETE", {});
-                                  await loadSaved();
-                                } catch (e) {
-                                  handleError(e);
-                                }
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p>
-                    결과 화면에서 마음에 드는 구성을 템플릿으로 저장해 보세요.
-                  </p>
-                )}
-              </section>
-              <Notice>
-                저장 위치: 이 프로젝트의 .data 폴더. 목록의 삭제 버튼으로 해당
-                작업의 분석 자료·원본·공유 권한을 함께 삭제해요. 별도로 만든
-                출력 파일과 외부 백업은 직접 삭제해야 해요.
-              </Notice>
-            </>
-          )}
-          <footer className="footer">
             <span>
-              HRBIP <small>HR Business Intelligence Partner</small>
+              HRBIP<small>HR Business Intelligence Partner</small>
             </span>
-            <button onClick={() => setRequestOpen(true)}>
-              더 나은 인사 업무를 함께 만들어요 <ArrowUpRight size={13} />
-            </button>
-          </footer>
-        </main>
-      </div>
-      {authOpen && (
-        <AuthModal
-          onClose={() => {
-            setAuthOpen(false);
-            setReturnToSaved(false);
-          }}
-          onSuccess={(u) => {
-            setUser(u);
-            setAuthOpen(false);
-            notify("로그인했어요. 작성 중인 내용은 그대로 유지돼요.");
-            if (returnToSaved) {
-              setReturnToSaved(false);
-              void fetchSaved();
-            }
-          }}
-        />
-      )}
-      {accountOpen && user && (
-        <Modal title="내 계정" onClose={() => setAccountOpen(false)}>
-          <h3>{user.username}</h3>
-          <p>공유를 받을 때 아래 계정 ID를 작업 소유자에게 알려주세요.</p>
-          <label>
-            공유용 계정 ID
-            <input
-              readOnly
-              value={user.id}
-              onFocus={(e) => e.target.select()}
-            />
-          </label>
-          <Button
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(user.id);
-                notify("계정 ID를 복사했어요.");
-              } catch {
-                notify("계정 ID 입력칸을 선택해서 복사해 주세요.");
-              }
-            }}
-          >
-            <Copy size={16} />
-            ID 복사
-          </Button>
-          <Notice>
-            현재 접속한 HRBIP 서버의 계정이에요. 비밀번호는 해시로 보관하고
-            로그인 세션은 12시간 유지돼요. 이메일 인증·비밀번호 찾기는 제공하지
-            않으니 비밀번호를 안전하게 보관해 주세요.
-          </Notice>
-          <Button onClick={logout}>
-            <LogOut size={17} />
-            로그아웃
-          </Button>
-        </Modal>
-      )}
-      {sampleListOpen && (
-        <Modal
-          title="샘플 데이터 선택"
-          onClose={() => !busy && setSampleListOpen(false)}
-        >
-          <p>가상 데이터로 업로드 없이 대시보드와 보고서를 체험해요.</p>
-          {error && <Notice tone="error">{error}</Notice>}
-          <div className="stack">
-            <section className="panel compact">
-              <h3>기본 샘플 · 48명 이력</h3>
-              <p>2026년 1~9월 · 5개 부서 · 기본 기능을 빠르게 확인해요.</p>
-              <Button disabled={busy} onClick={() => start(true, "result")}>
-                기본 샘플 열기
+          </button>
+          <div className="account-nav">
+            {guestMode ? (
+              <span className="muted">가입 없이 바로 사용</span>
+            ) : user ? (
+              <Button onClick={() => setAccountOpen(true)}>
+                <span className="avatar">{user.username[0].toUpperCase()}</span>
+                {user.username}
               </Button>
-            </section>
-            <section className="panel compact sample-panel">
-              <span className="tag">사용자 제공 가상 데이터</span>
-              <h3>150명·24개월 인사 데이터</h3>
-              <p>
-                2024년 10월~2026년 9월 · 최종 재직 150명 · 전체 이력 180명 · 7개
-                부서
-              </p>
-              <p className="small">
-                인원·입퇴사, 근무·휴가, 제공 인건비를 함께 살펴보세요. 원본의
-                이름·생년월일은 샘플에 포함하지 않았어요.
-              </p>
-              <Notice>
-                이 파일의 기준대로 퇴사일은 제외해요. 부서 필터는 최종 관측 소속
-                기준이며 과거 부서 이동 분석은 포함하지 않아요.
-              </Notice>
-              <Button variant="primary" busy={busy} onClick={startLargeSample}>
-                150명·24개월 샘플 열기
-              </Button>
-            </section>
-          </div>
-        </Modal>
-      )}
-      {requestOpen && <RequestModal onClose={() => setRequestOpen(false)} />}
-      {templateOpen && (
-        <Modal
-          title="구성을 템플릿으로 저장"
-          onClose={() => setTemplateOpen(false)}
-        >
-          {error && <Notice tone="error">{error}</Notice>}
-          <label>
-            템플릿 이름
-            <input
-              value={templateTitle}
-              onChange={(e) => setTemplateTitle(e.target.value)}
-              maxLength={160}
-            />
-          </label>
-          <Notice>
-            직원 데이터·집계 수치·보고 문장은 저장하지 않아요. 새 자료를 적용할
-            때 다시 연결하고 검증해요.
-          </Notice>
-          <Button
-            variant="primary"
-            disabled={!templateTitle.trim()}
-            onClick={async () => {
-              try {
-                await api("/templates", "POST", {
-                  title: templateTitle,
-                  design: w.design,
-                });
-                setTemplateOpen(false);
-                notify("템플릿을 저장했어요.");
-              } catch (e) {
-                handleError(e);
-              }
-            }}
-          >
-            템플릿 저장
-          </Button>
-        </Modal>
-      )}
-      {shareOpen && (
-        <Modal
-          title="지정 계정에 공유"
-          onClose={() => setShareOpen(false)}
-          wide
-        >
-          <Notice>
-            이 서버에 가입한 계정 ID를 추가하세요. 공유받은 사람은 조회·필터
-            탐색·집계 파일 출력만 할 수 있어요. 직원별 행과 원본 파일은 공유하지
-            않아요.
-          </Notice>
-          {error && <Notice tone="error">{error}</Notice>}
-          <label>
-            상대방 계정 ID
-            <input
-              value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              placeholder="상대방의 내 계정에서 복사한 ID"
-            />
-          </label>
-          <Button
-            disabled={!targetId.trim()}
-            onClick={async () => {
-              try {
-                await api("/works/" + workId + "/shares", "POST", {
-                  userId: targetId.trim(),
-                });
-                setShares(await api("/works/" + workId + "/shares"));
-                setTargetId("");
-                notify("지정 계정에 조회 권한을 추가했어요.");
-              } catch (e) {
-                handleError(e);
-              }
-            }}
-          >
-            조회 권한 추가
-          </Button>
-          <div className="share-list">
-            {shares.length ? (
-              shares.map((u) => (
-                <div className="row between" key={u.id}>
-                  <span>
-                    {u.username}
-                    <small>{u.id}</small>
-                  </span>
-                  <Button
-                    variant="danger"
-                    onClick={async () => {
-                      try {
-                        await api(
-                          "/works/" + workId + "/shares/" + u.id,
-                          "DELETE",
-                          {},
-                        );
-                        setShares(await api("/works/" + workId + "/shares"));
-                      } catch (e) {
-                        handleError(e);
-                      }
-                    }}
-                  >
-                    권한 해제
-                  </Button>
-                </div>
-              ))
             ) : (
-              <p>추가된 공유 대상이 없어요.</p>
+              <Button onClick={() => setAuthOpen(true)}>
+                <LogIn size={17} />
+                로그인
+              </Button>
             )}
           </div>
-          <label>
-            웹 공유 링크
-            <input
-              readOnly
-              value={location.origin + "/?share=" + workId}
-              onFocus={(e) => e.target.select()}
-            />
-          </label>
-          <Button
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(
-                  location.origin + "/?share=" + workId,
-                );
-                notify("공유 링크를 복사했어요.");
-              } catch {
-                notify("위 링크를 직접 선택해서 복사해 주세요.");
+        </header>
+        <div className="workspace">
+          <aside className="sidebar">
+            <div className="sidebar-label">WORKSPACE</div>
+            <nav className="workspace-nav" aria-label="워크스페이스">
+              <button
+                className={route === "home" ? "selected" : ""}
+                onClick={() => navigate("home")}
+              >
+                <Grid2X2 size={19} />
+                모든 도구
+              </button>
+              <button
+                className={
+                  ["input", "repeat", "verify", "result"].includes(route)
+                    ? "selected"
+                    : ""
+                }
+                onClick={() =>
+                  ["input", "repeat", "verify"].includes(route)
+                    ? navigate(route)
+                    : w.datasets.length && !shared
+                      ? navigate("result")
+                      : start()
+                }
+              >
+                <BarChart3 size={19} />
+                인사현황 보고서
+              </button>
+              {!guestMode && (
+                <button
+                  className={route === "saved" ? "selected" : ""}
+                  onClick={loadSaved}
+                >
+                  <FolderOpen size={19} />
+                  저장한 작업
+                </button>
+              )}
+            </nav>
+            <div className="sidebar-bottom">
+              <span className="round-icon">
+                <Leaf size={20} />
+              </span>
+              <strong>
+                반복은 줄이고,
+                <br />
+                사람에게 집중하세요.
+              </strong>
+              <p>
+                인사 업무를 위한
+                <br />
+                작은 도구부터 함께.
+              </p>
+              <button onClick={() => setRequestOpen(true)}>
+                기능 제안하기 <ArrowUpRight size={16} />
+              </button>
+            </div>
+          </aside>
+          <main id="main" tabIndex={-1}>
+            <div className="breadcrumb">
+              워크스페이스 <ChevronRight size={13} />{" "}
+              {route === "home"
+                ? "모든 도구"
+                : route === "saved"
+                  ? "저장한 작업"
+                  : shared
+                    ? "공유 보고서"
+                    : "인사현황 보고서·대시보드"}
+            </div>
+            {guestMode ? (
+              <Notice>
+                로그인 없이 내 파일 또는 샘플로 시작하세요. 작업과 회사 양식은
+                현재 탭에서만 유지되고, 새로고침하거나 탭을 닫으면 사라져요.
+                필요한 결과는 PDF·PPT·Excel로 내려받으세요.
+              </Notice>
+            ) : (
+              publicDemo && (
+                <Notice>
+                  포트폴리오 체험용 공개 버전이에요. 가상 데이터로 이용해
+                  주세요. 저장한 작업은 온라인 HRBIP 저장소에 보관되며, 내
+                  컴퓨터에서 만든 계정·작업과는 별개예요. 실제 인사자료를 위한
+                  보안·운영 검증은 아직 완료하지 않았어요.
+                </Notice>
+              )
+            )}
+            {error && (
+              <Notice tone="error">
+                {error}
+                <Button variant="ghost" onClick={() => setError("")}>
+                  닫기
+                </Button>
+                {error.includes("다른 화면") && (
+                  <Button onClick={() => save(true)}>새 작업으로 저장</Button>
+                )}
+              </Notice>
+            )}
+            {status && (
+              <div className="toast" role="status">
+                <Check size={18} />
+                {status}
+              </div>
+            )}
+            {busy && (
+              <div className="loading-line" role="status">
+                작업을 처리하고 있어요…
+              </div>
+            )}
+            {route === "home" && (
+              <>
+                <section className="home-intro">
+                  <div>
+                    <div className="eyebrow">
+                      <span className="tiny-dot" />
+                      YOUR HR WORK PARTNER
+                    </div>
+                    <h1 className="hero-brand">HRBIP</h1>
+                    <div className="hero-brand-name">
+                      HR Business Intelligence Partner
+                    </div>
+                    <h2 className="hero-message">
+                      기존 인사 자료에서,
+                      <br />
+                      검토 가능한 보고서까지.
+                    </h2>
+                    <p>
+                      인사 시스템에서 내려받은 파일과 엑셀을 연결하세요.
+                      <br />
+                      숫자의 기준을 확인하고, 차트와 문서를 편집해 보고에
+                      활용하세요.
+                    </p>
+                    <div className="hero-actions">
+                      <Button variant="primary" onClick={() => start()}>
+                        보고서 만들기 <ArrowRight size={22} />
+                      </Button>
+                      <Button onClick={() => setSampleListOpen(true)}>
+                        샘플로 먼저 보기
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="intro-illustration" aria-hidden="true">
+                    <div className="paper back" />
+                    <div className="paper front">
+                      <div className="illus-label">
+                        <span>PEOPLE INSIGHTS</span>
+                        <BarChart3 size={18} />
+                      </div>
+                      <div className="illus-title">
+                        우리 조직을 이해하는
+                        <br />더 명확한 시선.
+                      </div>
+                      <div className="illus-bars">
+                        {[40, 65, 52, 86, 72, 96].map((n, i) => (
+                          <i key={i} style={{ height: n + "%" }} />
+                        ))}
+                      </div>
+                      <span className="illus-footer">
+                        DATA → INSIGHT → ACTION
+                      </span>
+                    </div>
+                    <div className="floating-badge">
+                      <CheckCircle />
+                      자료에서 보고서까지
+                    </div>
+                  </div>
+                </section>
+                <section className="tools-heading">
+                  <div>
+                    <span className="eyebrow">TOOLS FOR YOUR WORK</span>
+                    <h2>오늘의 업무, 여기서 시작해요.</h2>
+                  </div>
+                  <span className="count-pill">사용 가능한 도구 1</span>
+                </section>
+                <div className="home-tools">
+                  <article className="featured-tool">
+                    <div className="tool-top">
+                      <span className="tool-icon">
+                        <BarChart3 size={26} />
+                      </span>
+                      <span className="tag">첫 번째 도구</span>
+                    </div>
+                    <h2>
+                      인사현황 보고서·
+                      <br />
+                      대시보드 만들기
+                    </h2>
+                    <p>
+                      기존 인사 파일을 연결하면, 보유한 자료에 맞춰
+                      <br className="desktop-only" />
+                      추천 대시보드와 수정 가능한 보고서 초안을 만들어요.
+                    </p>
+                    <div className="feature-chips">
+                      <span>인원·입퇴사</span>
+                      <span>근태·휴가</span>
+                      <span>인건비</span>
+                    </div>
+                    <div className="tool-actions">
+                      <Button variant="primary" onClick={() => start()}>
+                        내 자료로 시작하기 <ArrowRight size={18} />
+                      </Button>
+                      <Button onClick={() => start(true, "result")}>
+                        <FlaskConical size={17} />
+                        샘플로 체험하기
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => setSampleListOpen(true)}
+                      >
+                        샘플 목록
+                      </Button>
+                    </div>
+                    <div className="tool-foot">
+                      <ShieldCheck size={15} />
+                      원본을 보호하고, 확인한 기준으로 집계해요.
+                    </div>
+                  </article>
+                  <div className="stack">
+                    <article className="panel how-to">
+                      <h3>복잡한 설정 없이, 한 단계씩.</h3>
+                      {[
+                        [
+                          "01",
+                          "입력 · 기존 자료를 연결해요",
+                          "필요한 항목과 파일 구조를 먼저 확인하고 CSV·Excel을 가져오세요.",
+                        ],
+                        [
+                          "02",
+                          "확인 · 숫자의 근거를 검토해요",
+                          "누락·중복·기간과 계산 기준을 확인해요. 없는 자료는 추정하지 않아요.",
+                        ],
+                        [
+                          "03",
+                          "출력 · 보고할 자료를 완성해요",
+                          guestMode
+                            ? "문장과 차트를 미리 보고 PDF·PPT·Excel로 내려받으세요. 작업은 현재 탭에서만 유지돼요."
+                            : "문장과 차트를 미리 보고 PDF·PPT·Excel로 출력하세요. 다음 보고는 저장한 설정으로 시작해요.",
+                        ],
+                      ].map(([n, t, d]) => (
+                        <div className="how-step" key={n}>
+                          <span>{n}</span>
+                          <div>
+                            <strong>{t}</strong>
+                            <p>{d}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </article>
+                    <article className="coming-soon">
+                      <div>
+                        <span className="tag muted-tag">확장 예정</span>
+                        <h3>다음 도구는, 실제 필요에서.</h3>
+                        <p>반복해서 하는 인사 업무가 있나요?</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        aria-label="원하는 기능 요청"
+                        onClick={() => setRequestOpen(true)}
+                      >
+                        <Plus size={23} />
+                      </Button>
+                    </article>
+                  </div>
+                </div>
+                <section className="request-banner">
+                  <MessageSquarePlus size={26} />
+                  <div>
+                    <h3>“이런 기능도 있으면 좋겠어요.”</h3>
+                    <p>
+                      원하는 기능이 있으면 요청해보세요. 다음 개선의 출발점이
+                      돼요.
+                    </p>
+                  </div>
+                  <Button onClick={() => setRequestOpen(true)}>
+                    기능 요청하기 <ArrowUpRight size={16} />
+                  </Button>
+                </section>
+              </>
+            )}
+            {route === "input" && (
+              <DataInput
+                w={w}
+                setW={setW}
+                originals={originals}
+                setOriginals={setOriginals}
+                repeating={!!reusePlan}
+                onNext={() => navigate(reusePlan ? "repeat" : "verify")}
+                onSample={() => start(true, "verify")}
+                onSampleList={() => setSampleListOpen(true)}
+              />
+            )}
+            {route === "repeat" && reusePlan && (
+              <RepeatReview
+                w={w}
+                plan={reusePlan}
+                setW={setW}
+                onNext={() => navigate("verify")}
+                onBack={() => navigate("input")}
+              />
+            )}
+            {route === "verify" && (
+              <DataReview
+                w={w}
+                setW={setW}
+                onBack={() => navigate("input")}
+                onNext={createResult}
+              />
+            )}
+            {(route === "result" || shared) && (
+              <>
+                {!shared && (
+                  <div className="save-state" role="status">
+                    <strong>
+                      {guestMode
+                        ? "현재 탭에서 작업 중이에요"
+                        : workId
+                          ? dirty
+                            ? "저장 후 변경사항이 있어요"
+                            : "저장한 작업이에요"
+                          : "아직 저장하지 않은 작업이에요"}
+                    </strong>
+                    <span>
+                      {guestMode
+                        ? "새로고침하거나 탭을 닫기 전에 ‘최종 확인·내보내기’에서 필요한 결과를 다운로드하세요."
+                        : workId && !dirty
+                          ? "워크스페이스의 ‘저장한 작업’에서 다시 열 수 있어요."
+                          : !user
+                            ? "로그인 후 저장하면 다음 방문에도 이어서 볼 수 있어요. 파일 다운로드만으로는 작업 목록에 남지 않아요."
+                            : "보고서의 저장 버튼으로 현재 데이터와 편집 내용을 작업 목록에 남겨주세요."}
+                    </span>
+                  </div>
+                )}
+                <Results
+                  loggedIn={!!user}
+                  onLogin={() => setAuthOpen(true)}
+                  sharedId={shared ? sharedId : undefined}
+                  w={w}
+                  r={result}
+                  setW={setW}
+                  onFilters={(f) => {
+                    if (shared) void openShared(sharedId, f);
+                    else
+                      setW((v) => {
+                        v.filters = f;
+                      });
+                  }}
+                  onSave={() => save()}
+                  onRepeat={() => {
+                    if (canReplace()) repeatWorkspace(w);
+                  }}
+                  onTemplate={() => {
+                    if (!user) {
+                      setAuthOpen(true);
+                      return;
+                    }
+                    setTemplateTitle(w.title + " 구성");
+                    setTemplateOpen(true);
+                  }}
+                  onShare={beginShare}
+                  onExport={exportCurrent}
+                  onBack={() => navigate("verify")}
+                  readOnly={shared}
+                  busy={busy}
+                />
+              </>
+            )}
+            {!guestMode && route === "saved" && (
+              <>
+                <PageTitle
+                  eyebrow="SAVED WORKSPACE"
+                  title="이어서, 더 가볍게."
+                  description="저장한 작업을 다시 열거나, 익숙한 구성에 새로운 자료를 적용하세요."
+                  actions={
+                    <Button variant="primary" onClick={() => start()}>
+                      <Plus size={17} />새 작업
+                    </Button>
+                  }
+                />
+                <section className="panel">
+                  <div className="section-heading">
+                    <h2>저장한 작업·공유받은 보고서</h2>
+                    <span className="tag">{stored.length}</span>
+                  </div>
+                  {!stored.length ? (
+                    <div className="empty-state">
+                      <FolderOpen size={35} />
+                      <h3>아직 저장한 작업이 없어요.</h3>
+                      <p>
+                        보고서를 만든 뒤 저장하면 이곳에서 다시 열 수 있어요.
+                      </p>
+                      <Button onClick={() => start(true, "result")}>
+                        샘플로 시작하기
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="saved-list">
+                      {stored.map((item) => (
+                        <article key={item.id}>
+                          <span className="file-icon">
+                            <FileSpreadsheet size={23} />
+                          </span>
+                          <div>
+                            <h3>{item.title}</h3>
+                            <p>
+                              {item.owned ? "내 작업" : "공유받은 작업"} ·{" "}
+                              {new Date(item.updated).toLocaleString("ko-KR")}
+                            </p>
+                            <small>
+                              공유 {item.sharedCount}개 계정 · 원본{" "}
+                              {item.originalCount
+                                ? "보관 " + item.originalCount + "개"
+                                : "미보관"}{" "}
+                              · 분석 데이터 저장됨
+                            </small>
+                          </div>
+                          <div className="actions">
+                            <Button onClick={() => openWork(item)}>
+                              열기 <ArrowRight size={15} />
+                            </Button>
+                            {!!item.owned && (
+                              <Button
+                                onClick={() => repeatStored(item)}
+                                busy={busy}
+                              >
+                                새 자료로 반복 보고
+                              </Button>
+                            )}
+                            {!!item.owned && (
+                              <Button
+                                variant="ghost"
+                                aria-label={item.title + " 삭제"}
+                                onClick={async () => {
+                                  if (
+                                    !confirm(
+                                      "작업·분석 데이터·보관 원본·공유 권한을 삭제할까요? 되돌릴 수 없습니다.",
+                                    )
+                                  )
+                                    return;
+                                  try {
+                                    await api(
+                                      "/works/" + item.id,
+                                      "DELETE",
+                                      {},
+                                    );
+                                    if (workId === item.id) {
+                                      setWorkId("");
+                                      setRevision(0);
+                                    }
+                                    await loadSaved();
+                                  } catch (e) {
+                                    handleError(e);
+                                  }
+                                }}
+                              >
+                                <Trash2 size={17} />
+                              </Button>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+                <section className="panel">
+                  <div className="section-heading">
+                    <h2>내 템플릿</h2>
+                    <span className="tag">{templates.length}</span>
+                  </div>
+                  <p className="muted">
+                    차트·제목·배치·색상만 저장해요. 이전 직원 정보와 수치는
+                    포함되지 않아요.
+                  </p>
+                  {templates.length ? (
+                    <div className="template-grid">
+                      {templates.map((t) => (
+                        <article key={t.id}>
+                          <Settings2 size={21} />
+                          <h3>{t.title}</h3>
+                          <p>구성 카드 {t.design.cards.length}개</p>
+                          <div className="actions">
+                            <Button
+                              onClick={() => start(false, "input", t.design)}
+                            >
+                              새 데이터 적용
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              aria-label={t.title + " 템플릿 삭제"}
+                              onClick={async () => {
+                                if (confirm("이 템플릿을 삭제할까요?"))
+                                  try {
+                                    await api(
+                                      "/templates/" + t.id,
+                                      "DELETE",
+                                      {},
+                                    );
+                                    await loadSaved();
+                                  } catch (e) {
+                                    handleError(e);
+                                  }
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>
+                      결과 화면에서 마음에 드는 구성을 템플릿으로 저장해 보세요.
+                    </p>
+                  )}
+                </section>
+                <Notice>
+                  저장 위치: 이 프로젝트의 .data 폴더. 목록의 삭제 버튼으로 해당
+                  작업의 분석 자료·원본·공유 권한을 함께 삭제해요. 별도로 만든
+                  출력 파일과 외부 백업은 직접 삭제해야 해요.
+                </Notice>
+              </>
+            )}
+            <footer className="footer">
+              <span>
+                HRBIP <small>HR Business Intelligence Partner</small>
+              </span>
+              <button onClick={() => setRequestOpen(true)}>
+                더 나은 인사 업무를 함께 만들어요 <ArrowUpRight size={13} />
+              </button>
+            </footer>
+          </main>
+        </div>
+        {!guestMode && authOpen && (
+          <AuthModal
+            onClose={() => {
+              setAuthOpen(false);
+              setReturnToSaved(false);
+            }}
+            onSuccess={(u) => {
+              setUser(u);
+              setAuthOpen(false);
+              notify("로그인했어요. 작성 중인 내용은 그대로 유지돼요.");
+              if (returnToSaved) {
+                setReturnToSaved(false);
+                void fetchSaved();
               }
             }}
+          />
+        )}
+        {!guestMode && accountOpen && user && (
+          <Modal title="내 계정" onClose={() => setAccountOpen(false)}>
+            <h3>{user.username}</h3>
+            <p>공유를 받을 때 아래 계정 ID를 작업 소유자에게 알려주세요.</p>
+            <label>
+              공유용 계정 ID
+              <input
+                readOnly
+                value={user.id}
+                onFocus={(e) => e.target.select()}
+              />
+            </label>
+            <Button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(user.id);
+                  notify("계정 ID를 복사했어요.");
+                } catch {
+                  notify("계정 ID 입력칸을 선택해서 복사해 주세요.");
+                }
+              }}
+            >
+              <Copy size={16} />
+              ID 복사
+            </Button>
+            <Notice>
+              현재 접속한 HRBIP 서버의 계정이에요. 비밀번호는 해시로 보관하고
+              로그인 세션은 12시간 유지돼요. 이메일 인증·비밀번호 찾기는
+              제공하지 않으니 비밀번호를 안전하게 보관해 주세요.
+            </Notice>
+            <Button onClick={logout}>
+              <LogOut size={17} />
+              로그아웃
+            </Button>
+          </Modal>
+        )}
+        {sampleListOpen && (
+          <Modal
+            title="샘플 데이터 선택"
+            onClose={() => !busy && setSampleListOpen(false)}
           >
-            <Copy size={16} />
-            링크 복사
-          </Button>
-          <p className="small">
-            {publicDemo
-              ? "이 주소에서 가입한 계정에 공유할 수 있어요. "
-              : "내 컴퓨터의 로컬 주소는 다른 컴퓨터에서 열 수 없어요. "}
-            링크가 있어도 지정 계정으로 로그인하지 않으면 볼 수 없어요.
-          </p>
-          {originalMeta.length > 0 && (
-            <details>
-              <summary>보관 원본 (소유자 전용)</summary>
-              {originalMeta.map((o) => (
-                <p key={o.id}>
-                  <a href={"/api/works/" + workId + "/originals/" + o.id}>
-                    {o.name} 내려받기
-                  </a>
+            <p>가상 데이터로 업로드 없이 대시보드와 보고서를 체험해요.</p>
+            {error && <Notice tone="error">{error}</Notice>}
+            <div className="stack">
+              <section className="panel compact">
+                <h3>기본 샘플 · 48명 이력</h3>
+                <p>2026년 1~9월 · 5개 부서 · 기본 기능을 빠르게 확인해요.</p>
+                <Button disabled={busy} onClick={() => start(true, "result")}>
+                  기본 샘플 열기
+                </Button>
+              </section>
+              <section className="panel compact sample-panel">
+                <span className="tag">사용자 제공 가상 데이터</span>
+                <h3>150명·24개월 인사 데이터</h3>
+                <p>
+                  2024년 10월~2026년 9월 · 최종 재직 150명 · 전체 이력 180명 ·
+                  7개 부서
                 </p>
-              ))}
-            </details>
-          )}
-        </Modal>
-      )}
-    </div>
+                <p className="small">
+                  인원·입퇴사, 근무·휴가, 제공 인건비를 함께 살펴보세요. 원본의
+                  이름·생년월일은 샘플에 포함하지 않았어요.
+                </p>
+                <Notice>
+                  이 파일의 기준대로 퇴사일은 제외해요. 부서 필터는 최종 관측
+                  소속 기준이며 과거 부서 이동 분석은 포함하지 않아요.
+                </Notice>
+                <Button
+                  variant="primary"
+                  busy={busy}
+                  onClick={startLargeSample}
+                >
+                  150명·24개월 샘플 열기
+                </Button>
+              </section>
+            </div>
+          </Modal>
+        )}
+        {requestOpen && <RequestModal onClose={() => setRequestOpen(false)} />}
+        {!guestMode && templateOpen && (
+          <Modal
+            title="구성을 템플릿으로 저장"
+            onClose={() => setTemplateOpen(false)}
+          >
+            {error && <Notice tone="error">{error}</Notice>}
+            <label>
+              템플릿 이름
+              <input
+                value={templateTitle}
+                onChange={(e) => setTemplateTitle(e.target.value)}
+                maxLength={160}
+              />
+            </label>
+            <Notice>
+              직원 데이터·집계 수치·보고 문장은 저장하지 않아요. 새 자료를
+              적용할 때 다시 연결하고 검증해요.
+            </Notice>
+            <Button
+              variant="primary"
+              disabled={!templateTitle.trim()}
+              onClick={async () => {
+                try {
+                  await api("/templates", "POST", {
+                    title: templateTitle,
+                    design: w.design,
+                  });
+                  setTemplateOpen(false);
+                  notify("템플릿을 저장했어요.");
+                } catch (e) {
+                  handleError(e);
+                }
+              }}
+            >
+              템플릿 저장
+            </Button>
+          </Modal>
+        )}
+        {!guestMode && shareOpen && (
+          <Modal
+            title="지정 계정에 공유"
+            onClose={() => setShareOpen(false)}
+            wide
+          >
+            <Notice>
+              이 서버에 가입한 계정 ID를 추가하세요. 공유받은 사람은 조회·필터
+              탐색·집계 파일 출력만 할 수 있어요. 직원별 행과 원본 파일은
+              공유하지 않아요.
+            </Notice>
+            {error && <Notice tone="error">{error}</Notice>}
+            <label>
+              상대방 계정 ID
+              <input
+                value={targetId}
+                onChange={(e) => setTargetId(e.target.value)}
+                placeholder="상대방의 내 계정에서 복사한 ID"
+              />
+            </label>
+            <Button
+              disabled={!targetId.trim()}
+              onClick={async () => {
+                try {
+                  await api("/works/" + workId + "/shares", "POST", {
+                    userId: targetId.trim(),
+                  });
+                  setShares(await api("/works/" + workId + "/shares"));
+                  setTargetId("");
+                  notify("지정 계정에 조회 권한을 추가했어요.");
+                } catch (e) {
+                  handleError(e);
+                }
+              }}
+            >
+              조회 권한 추가
+            </Button>
+            <div className="share-list">
+              {shares.length ? (
+                shares.map((u) => (
+                  <div className="row between" key={u.id}>
+                    <span>
+                      {u.username}
+                      <small>{u.id}</small>
+                    </span>
+                    <Button
+                      variant="danger"
+                      onClick={async () => {
+                        try {
+                          await api(
+                            "/works/" + workId + "/shares/" + u.id,
+                            "DELETE",
+                            {},
+                          );
+                          setShares(await api("/works/" + workId + "/shares"));
+                        } catch (e) {
+                          handleError(e);
+                        }
+                      }}
+                    >
+                      권한 해제
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p>추가된 공유 대상이 없어요.</p>
+              )}
+            </div>
+            <label>
+              웹 공유 링크
+              <input
+                readOnly
+                value={location.origin + "/?share=" + workId}
+                onFocus={(e) => e.target.select()}
+              />
+            </label>
+            <Button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    location.origin + "/?share=" + workId,
+                  );
+                  notify("공유 링크를 복사했어요.");
+                } catch {
+                  notify("위 링크를 직접 선택해서 복사해 주세요.");
+                }
+              }}
+            >
+              <Copy size={16} />
+              링크 복사
+            </Button>
+            <p className="small">
+              {publicDemo
+                ? "이 주소에서 가입한 계정에 공유할 수 있어요. "
+                : "내 컴퓨터의 로컬 주소는 다른 컴퓨터에서 열 수 없어요. "}
+              링크가 있어도 지정 계정으로 로그인하지 않으면 볼 수 없어요.
+            </p>
+            {originalMeta.length > 0 && (
+              <details>
+                <summary>보관 원본 (소유자 전용)</summary>
+                {originalMeta.map((o) => (
+                  <p key={o.id}>
+                    <a href={"/api/works/" + workId + "/originals/" + o.id}>
+                      {o.name} 내려받기
+                    </a>
+                  </p>
+                ))}
+              </details>
+            )}
+          </Modal>
+        )}
+      </div>
+    </GuestContext.Provider>
   );
 }
 function CheckCircle() {
@@ -1292,10 +1355,29 @@ function AuthModal({
   );
 }
 function RequestModal({ onClose }: { onClose: () => void }) {
+  const guest = useGuest();
   const [message, setMessage] = useState(""),
     [status, setStatus] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  if (guest.enabled)
+    return (
+      <Modal title="기능 제안하기" onClose={onClose}>
+        <p>어떤 상황에서 어떤 기능이 필요한지 GitHub 이슈에 남길 수 있어요.</p>
+        <p>
+          외부 GitHub 사이트에서 직접 작성·제출하며 GitHub 로그인이 필요해요.
+          이슈는 공개되므로 개인정보나 회사 자료는 올리지 마세요.
+        </p>
+        <a
+          className="button primary"
+          href="https://github.com/yangrin327-tech/HRBIP/issues/new"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub에서 제안 작성하기 ↗
+        </a>
+      </Modal>
+    );
   return (
     <Modal title="어떤 업무를 더 도와드릴까요?" onClose={onClose}>
       <p>반복해서 만드는 자료나 불편한 업무를 알려주세요.</p>

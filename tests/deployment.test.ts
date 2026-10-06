@@ -5,7 +5,7 @@ import { serverConfig } from "../server/config";
 import { createApp } from "../server/app";
 import { openStore } from "../server/store";
 
-test("public hosting fails closed for missing HTTPS, secure cookies or data location", () => {
+test("public hosting enforces HTTPS and always uses guest mode without storage", () => {
   assert.equal(serverConfig({}).host, "127.0.0.1");
   assert.throws(() => serverConfig({ PUBLIC_DEMO: "true" }), /HTTPS/);
   const publicEnv = {
@@ -13,7 +13,15 @@ test("public hosting fails closed for missing HTTPS, secure cookies or data loca
     APP_ORIGIN: "https://hrbip.example",
     COOKIE_SECURE: "true",
   };
-  assert.throws(() => serverConfig(publicEnv), /DATA_DIR/);
+  assert.equal(serverConfig(publicEnv).guestMode, true);
+  assert.equal(
+    serverConfig({ ...publicEnv, HRBIP_ACCOUNTS_ENABLED: "true" }).guestMode,
+    true,
+  );
+  assert.equal(
+    serverConfig({ HRBIP_ACCOUNTS_ENABLED: "true" }).guestMode,
+    false,
+  );
   const env = {
     ...publicEnv,
     DATA_DIR: "/data",
@@ -86,7 +94,7 @@ test("public origin is enforced and demo metadata is available without authentic
         password: "fictional-password-only",
       }),
     });
-    assert.equal(same.status, 401);
+    assert.equal(same.status, 403);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     db.close();

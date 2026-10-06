@@ -31,6 +31,7 @@ import { verifyCalculations } from "../shared/verification.js";
 import { exportVerification } from "./verification-export.js";
 import { FormatError } from "./office-xml.js";
 import { verifyOfficeOutput } from "./verify-output.js";
+import { prepareGuestFormat } from "./guest.js";
 import {
   installTransfers,
   streamLargeResponses,
@@ -79,6 +80,7 @@ export function createApp(
     origin?: string;
     production?: boolean;
     publicDemo?: boolean;
+    guestMode?: boolean;
     trustProxyHops?: number;
   } = {},
 ) {
@@ -143,7 +145,31 @@ export function createApp(
     next();
   });
   streamLargeResponses(app);
-  installTransfers(app, db);
+  const guestMode = !!options.guestMode || !!options.publicDemo;
+  if (guestMode) {
+    const routes = new Set([
+      "GET /health",
+      "GET /me",
+      "POST /verification",
+      "POST /verification/download",
+      "POST /company-formats/inspect",
+      "POST /company-formats/prepare",
+      "POST /export/pdf",
+      "POST /export/pptx",
+      "POST /export/xlsx",
+    ]);
+    app.use("/api", (req, _res, next) => {
+      // Includes old authenticated sessions and all original/download/share paths.
+      if (!routes.has(req.method + " " + req.path.replace(/\/$/, "")))
+        return next(
+          new HttpError(
+            403,
+            "이 버전은 계정·서버 저장·웹 공유를 사용하지 않습니다. 홈에서 파일 또는 샘플로 시작하세요.",
+          ),
+        );
+      next();
+    });
+  } else installTransfers(app, db);
   const auth = async (req: Request) => {
     const u = await currentUser(db, req);
     if (!u)
@@ -199,6 +225,10 @@ export function createApp(
   app.post("/api/company-formats/inspect", async (req, res) => {
     const body = formatUpload.parse(req.body);
     res.json(await inspectCompanyFormat(Buffer.from(body.data, "base64")));
+  });
+  app.post("/api/company-formats/prepare", async (req, res) => {
+    const prepared = await prepareGuestFormat(req.body);
+    res.json({ meta: prepared.meta, input: prepared.input });
   });
   app.get("/api/company-formats", async (req, res) => {
     const u = await auth(req);
@@ -317,13 +347,15 @@ export function createApp(
     res.json({
       ok: true,
       reportProvider: "rules",
-      storage: options.publicDemo ? "server" : "local",
+      storage: guestMode ? "none" : options.publicDemo ? "server" : "local",
+      guestMode,
       publicDemo: !!options.publicDemo,
     }),
   );
   app.get("/api/me", async (req, res) =>
     res.json({
-      user: await currentUser(db, req),
+      user: guestMode ? null : await currentUser(db, req),
+      guestMode,
       publicDemo: !!options.publicDemo,
     }),
   );
@@ -643,6 +675,7 @@ export function createApp(
     w: Workspace,
     owner?: string,
     shared = false,
+    guestFormat?: unknown,
   ) => {
     if (activeExports >= 2)
       throw new HttpError(
@@ -673,12 +706,21 @@ export function createApp(
       const formatId = w.companyFormats?.[format as "pptx" | "xlsx"];
       let file: Buffer, appliedMeta: CompanyFormat | undefined;
       if (formatId) {
-        if (!owner)
+        if (!owner && !guestMode)
           throw new HttpError(
             401,
             "회사 양식 내보내기는 로그인 후 이용하세요.",
           );
-        const saved = await getFormat(formatId, owner);
+        if (guestMode && !guestFormat)
+          throw new HttpError(
+            422,
+            "현재 탭에 회사 양식이 없습니다. 양식을 다시 선택하거나 HRBIP 기본 양식을 사용하세요.",
+          );
+        const saved = guestMode
+          ? await prepareGuestFormat(guestFormat)
+          : await getFormat(formatId, owner!);
+        if (saved.meta.format !== format)
+          throw new HttpError(422, "출력 형식과 회사 양식 형식이 다릅니다.");
         appliedMeta = saved.meta;
         const applied = await applyCompanyFormat(
           saved.data,
@@ -714,7 +756,9 @@ export function createApp(
       res,
       String(req.params.format),
       w,
-      (await currentUser(db, req))?.id,
+      guestMode ? undefined : (await currentUser(db, req))?.id,
+      false,
+      guestMode ? req.body.companyFormat : undefined,
     );
   });
   app.post("/api/works/:id/export/:format", exportLimit, async (req, res) => {

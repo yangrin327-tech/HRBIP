@@ -17,10 +17,36 @@ async function responseError(res: Response) {
   );
 }
 
-async function request(path: string, method: string, body?: unknown) {
+let guestRequests = true;
+export function setGuestRequests(enabled: boolean) {
+  guestRequests = enabled;
+}
+export async function request(path: string, method: string, body?: unknown) {
   if (method === "GET") return fetch("/api" + path);
   const json = JSON.stringify(body ?? {}),
     bytes = new TextEncoder().encode(json);
+  if (guestRequests && bytes.length >= 3 * 1024 * 1024) {
+    // Compress in memory instead of using the old database-backed transfer queue.
+    const compressed = await new Response(
+      new Blob([json]).stream().pipeThrough(new CompressionStream("gzip")),
+    ).arrayBuffer();
+    if (
+      compressed.byteLength > 4 * 1024 * 1024 ||
+      bytes.length > 40 * 1024 * 1024
+    )
+      throw new ApiError(
+        "일회성 처리 용량을 초과했어요 (압축 전 40MB / 전송 4MB). 자료를 나누거나 회사 양식의 이미지를 줄여 다시 시도하세요. 현재 작업은 그대로 유지돼요.",
+        413,
+      );
+    return fetch("/api" + path, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Encoding": "gzip",
+      },
+      body: compressed,
+    });
+  }
   if (bytes.length < 3 * 1024 * 1024)
     return fetch("/api" + path, {
       method,

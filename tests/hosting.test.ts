@@ -34,17 +34,16 @@ test("SQLite async transactions isolate requests and roll back failed writes", a
   await db.close();
 });
 
-test("hosted config requires remote storage on Vercel", () => {
+test("Vercel requires public guest mode and no longer requires remote storage", () => {
   assert.throws(
     () => serverConfig({ VERCEL: "1", DATA_DIR: "/tmp" }),
-    /DATABASE_URL/,
+    /PUBLIC_DEMO/,
   );
   assert.equal(
     serverConfig({
       PUBLIC_DEMO: "true",
       APP_ORIGIN: "https://hrbip.example",
       COOKIE_SECURE: "true",
-      DATABASE_URL: "postgres://not-a-real-connection",
     }).publicDemo,
     true,
   );

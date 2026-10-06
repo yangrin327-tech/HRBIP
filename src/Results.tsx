@@ -28,6 +28,7 @@ import { MetricEvidence } from "./MetricEvidence";
 import { ExportPreview } from "./ExportPreview";
 import { CompanyFormats } from "./CompanyFormats";
 import { CalculationVerification } from "./CalculationVerification";
+import { useGuest } from "./guest";
 export function Results({
   w,
   r,
@@ -61,6 +62,7 @@ export function Results({
   onLogin?: () => void;
   sharedId?: string;
 }) {
+  const guest = useGuest();
   const [companyOpen, setCompanyOpen] = useState(false),
     [verificationOpen, setVerificationOpen] = useState(false);
   const [baseFilters] = useState(w.filters);
@@ -119,7 +121,7 @@ export function Results({
         }
         actions={
           <>
-            {!readOnly && (
+            {!readOnly && !guest.enabled && (
               <>
                 <Button busy={busy} onClick={onSave}>
                   <Save size={17} />
@@ -275,10 +277,12 @@ export function Results({
         </div>
         {!readOnly && (
           <div className="actions">
-            <Button onClick={onTemplate}>
-              <BookmarkPlus size={16} />
-              템플릿 저장
-            </Button>
+            {!guest.enabled && (
+              <Button onClick={onTemplate}>
+                <BookmarkPlus size={16} />
+                템플릿 저장
+              </Button>
+            )}
             <Button
               onClick={() => setEditing(!editing)}
               aria-expanded={editing}
@@ -692,7 +696,7 @@ export function Results({
           <p>대시보드와 보고서는 아래 집계 기준을 함께 사용해요.</p>
           <Notice>
             {w.companyFormats?.[format as "pptx" | "xlsx"]
-              ? "저장한 회사 양식에 연결한 항목으로 출력해요. 연결하지 않은 항목은 포함하지 않아요. 양식의 칸이 부족하면 수정할 위치를 안내해요."
+              ? "선택한 회사 양식에 연결한 항목으로 출력해요. 연결하지 않은 항목은 포함하지 않아요. 양식의 칸이 부족하면 수정할 위치를 안내해요."
               : "HRBIP 기본 양식으로 출력해요."}{" "}
             계산값은 서버에서 다시 대조하고 불일치가 있으면 다운로드를 중단해요.
           </Notice>

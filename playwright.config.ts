@@ -19,6 +19,8 @@ export default defineConfig({
       PORT: "4180",
       APP_ORIGIN: "http://127.0.0.1:4180",
       DATA_DIR: ".data/e2e-" + Date.now(),
+      // Regression suite for preserved local account functionality only.
+      HRBIP_ACCOUNTS_ENABLED: "true",
     },
   },
 });

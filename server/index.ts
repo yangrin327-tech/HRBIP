@@ -5,14 +5,24 @@ import { createApp } from "./app.js";
 import express from "express";
 import { serverConfig } from "./config.js";
 import { postgresStore, sqliteStore } from "./database.js";
+import { noStorage } from "./guest.js";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 else if (existsSync(".env")) process.loadEnvFile(".env");
-const { port, host, origin, publicDemo, trustProxyHops } = serverConfig();
+const { port, host, origin, publicDemo, guestMode, trustProxyHops } =
+  serverConfig();
 const production = process.argv.includes("--production");
-const db = process.env.DATABASE_URL
-  ? postgresStore(process.env.DATABASE_URL)
-  : sqliteStore(openStore());
-const app = createApp(db, { production, origin, publicDemo, trustProxyHops });
+const db = guestMode
+  ? noStorage
+  : process.env.DATABASE_URL
+    ? postgresStore(process.env.DATABASE_URL)
+    : sqliteStore(openStore());
+const app = createApp(db, {
+  production,
+  origin,
+  publicDemo,
+  guestMode,
+  trustProxyHops,
+});
 if (production) {
   app.use(express.static(resolve("dist")));
   app.get("/{*path}", (_req, res) => res.sendFile(resolve("dist/index.html")));
