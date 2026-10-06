@@ -431,3 +431,7 @@
 - 브라우저·주소별 저장 범위와 삭제·동기화 한계를 화면/README/GUEST_MODE에 설명했다. 개인 자료·작업 저장 내용은 GitHub에 올리지 않는다.
 - 사용자 승인: 의미 있는 후속 변경은 검증 후 저장·커밋·main 푸시·Vercel 재배포 확인을 추가 질문 없이 수행한다.
 - 실제 검증: 코드/API 테스트 44/44, 기존 공개 흐름 6개 통과, 저장·복원 신규 시나리오 5/5 통과. 첫 저장 목록 테스트의 제목 선택 오류를 수정해 재실행했다. TypeScript/Vite 빌드와 일반 Node ESM 진입점 검사 통과. 배포 확인은 푸시 후 추가한다.
+
+- 기능 커밋 `3379b60`을 `main`에 푸시했다. Vercel `Bg3nkgpUTK9RrUStu98X3R5Ccv1J` Ready(55초)와 `https://hrbip.vercel.app/`의 자동 저장·작업 목록을 직접 확인했다.
+- 공개 사이트에서 가상 샘플을 열고 담당자 의견 수정·저장 후 실제 새로고침했다. 수정 문장이 복원되고 작업 목록에 1건이 남았다. 증거 스크린샷은 Git 제외 `artifacts/deployment/persistence/public-saved-works.png`에 보관했다.
+- Windows 자동 실행 서버도 새 빌드로 재시작하고 4173 health 정상·guestMode true·storage none을 확인했다. 사용자 기존 미추적 `docs/SYNTHETIC_DATA.md`, `scripts/hr_data/`는 수정·커밋하지 않았다.

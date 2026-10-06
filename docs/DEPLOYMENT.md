@@ -123,3 +123,8 @@ API 검증은 가상 테스트 계정 3개로 실행했다. 테스트 작업·�
 - [Vercel 설정 파일](https://vercel.com/docs/project-configuration/vercel-json)
 - [Supabase PostgreSQL 연결](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [서버용 Chromium](https://github.com/Sparticuz/chromium)
+
+
+### 브라우저 자동 저장 배포 확인 (2026-10-06)
+
+기능 커밋 `3379b60` · Vercel `Bg3nkgpUTK9RrUStu98X3R5Ccv1J` Ready. 공개 도메인에서 샘플 의견 수정·저장 후 새로고침 복원과 저장 작업 목록을 직접 확인했다. 서버 계정/DB/API 설정은 변경하지 않았다. 새 기능은 같은 사이트·브라우저의 IndexedDB에 보관하며 다른 기기와 자동 동기화하지 않는다. 후속 코드 변경은 검증·커밋·main 푸시·배포 확인을 계속 수행한다.
