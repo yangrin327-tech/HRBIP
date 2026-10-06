@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import pptxgen from "pptxgenjs";
-import { chromium } from "playwright";
+import { launchPdfBrowser, pdfFontCss } from "./pdf-runtime";
 import { aggregate, effectiveCards, formatValue } from "../shared/analytics";
 import { parseDate } from "../shared/import";
 import { verifyCalculations, sharedVerification } from "../shared/verification";
@@ -778,11 +778,12 @@ export function pdfHtml(w: Workspace, r = aggregate(w)): string {
   );
 }
 export async function exportPdf(w: Workspace, r = aggregate(w)) {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchPdfBrowser();
   try {
     const page = await browser.newPage();
     await page.route("**/*", (route) => route.abort());
-    await page.setContent(pdfHtml(w, r), { waitUntil: "load" });
+    const html = pdfHtml(w, r).replace("</style>", pdfFontCss() + '\nbody{font-family:"Noto Sans KR",sans-serif}.chart svg{font-family:"Noto Sans KR",sans-serif}</style>');
+    await page.setContent(html, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);
     return await page.pdf({
       format: "A4",

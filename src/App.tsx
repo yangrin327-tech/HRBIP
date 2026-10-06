@@ -62,6 +62,7 @@ export default function App() {
     [accountOpen, setAccountOpen] = useState(false),
     [requestOpen, setRequestOpen] = useState(false);
   const [sampleListOpen, setSampleListOpen] = useState(false);
+  const [publicDemo, setPublicDemo] = useState(false);
   const [returnToSaved, setReturnToSaved] = useState(false);
   const [reusePlan, setReusePlan] = useState<ReusePlan | null>(null);
   const [workId, setWorkId] = useState(""),
@@ -97,7 +98,10 @@ export default function App() {
   );
   useEffect(() => {
     api("/me")
-      .then((data) => setUser(data.user))
+      .then((data) => {
+        setUser(data.user);
+        setPublicDemo(!!data.publicDemo);
+      })
       .catch(() =>
         setError(
           "서버에 연결하지 못했어요. 실행 중인지 확인하고 새로고침해 주세요.",
@@ -242,7 +246,7 @@ export default function App() {
       setWorkId(data.id);
       setRevision(data.revision);
       setDirty(false);
-      notify("작업과 편집 내용을 이 PC에 저장했어요.");
+      notify("작업과 편집 내용을 HRBIP에 저장했어요.");
       return data.id;
     } catch (e) {
       handleError(e);
@@ -509,6 +513,14 @@ export default function App() {
                   ? "공유 보고서"
                   : "인사현황 보고서·대시보드"}
           </div>
+          {publicDemo && (
+            <Notice>
+              포트폴리오 체험용 공개 버전이에요. 가상 데이터로 이용해 주세요.
+              저장한 작업은 온라인 HRBIP 저장소에 보관되며, 내 컴퓨터에서 만든
+              계정·작업과는 별개예요. 실제 인사자료를 위한 보안·운영 검증은 아직
+              완료하지 않았어요.
+            </Notice>
+          )}
           {error && (
             <Notice tone="error">
               {error}
@@ -980,7 +992,7 @@ export default function App() {
             ID 복사
           </Button>
           <Notice>
-            이 PC에서 실행 중인 HRBIP 계정이에요. 비밀번호는 해시로 보관하고
+            현재 접속한 HRBIP 서버의 계정이에요. 비밀번호는 해시로 보관하고
             로그인 세션은 12시간 유지돼요. 이메일 인증·비밀번호 찾기는 제공하지
             않으니 비밀번호를 안전하게 보관해 주세요.
           </Notice>
@@ -1158,9 +1170,10 @@ export default function App() {
             링크 복사
           </Button>
           <p className="small">
-            현재는 내 컴퓨터에서만 실행 중이에요. 다른 컴퓨터에서 접속하려면
-            별도 배포가 필요해요. 링크가 있어도 지정 계정으로 로그인하지 않으면
-            볼 수 없어요.
+            {publicDemo
+              ? "이 주소에서 가입한 계정에 공유할 수 있어요. "
+              : "내 컴퓨터의 로컬 주소는 다른 컴퓨터에서 열 수 없어요. "}
+            링크가 있어도 지정 계정으로 로그인하지 않으면 볼 수 없어요.
           </p>
           {originalMeta.length > 0 && (
             <details>
@@ -1202,7 +1215,10 @@ function AuthModal({
       <div className="auth-icon">
         <LockKeyhole size={26} />
       </div>
-      <p>로그인하면 작업·보고서·템플릿을 이 PC에 저장하고 다시 열 수 있어요.</p>
+      <p>
+        로그인하면 작업·보고서·템플릿을 현재 접속한 HRBIP 서버에 저장하고 다시
+        열 수 있어요.
+      </p>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -1295,7 +1311,8 @@ function RequestModal({ onClose }: { onClose: () => void }) {
         />
       </label>
       <small>
-        이 PC의 기능 요청함에 저장해요. 운영자나 외부 서비스로 전송하지 않아요.
+        현재 접속한 HRBIP 서버의 기능 요청함에 저장해요. 개인정보는 적지 말아
+        주세요.
       </small>
       {status && <Notice tone="success">{status}</Notice>}
       {error && <Notice tone="error">{error}</Notice>}

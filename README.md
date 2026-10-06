@@ -27,6 +27,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1
 
 제출용 공개 저장소: [yangrin327-tech/HRBIP](https://github.com/yangrin327-tech/HRBIP). 기본 브랜치는 `main`이다. 외부 웹 배포는 아직 하지 않았다.
 
+사용자의 이전 실습과 같은 **Vercel + Supabase 배포를 준비 중**이다. 로컬 저장을 유지하면서 PostgreSQL, 큰 파일 전송, 서버 PDF 출력을 추가했다. 외부 계정 연결과 실제 공개 URL 검증은 남아 있다. 설정과 현재 상태는 [배포 안내](docs/DEPLOYMENT.md)에 기록한다.
+
 - 실제 사용자 계정, 비밀번호, 저장 보고서, 업로드 원본, 로컬 DB, 환경설정 비밀값은 저장소에 포함하지 않는다.
 - 내장 샘플은 가상 인사 자료다. 기본 샘플과 150명·24개월 샘플을 비로그인으로 체험할 수 있다.
 - 초기 기획 문서는 당시 결정의 기록이다. 현재 기능은 아래 상태와 `docs/IMPLEMENTATION.md`를 기준으로 확인한다.
@@ -37,9 +39,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1
 ## 현재 상태
 
 - 기준일: 2026-10-06. **로컬 v0.1.4. 회사 PPTX·Excel 양식 등록/연결/재사용, 독립 계산 대조와 검증표.**
-- 사용자 확인: 내 컴퓨터에서 먼저 실행. 2026-10-06 제출용 GitHub Public 공개를 선택했으며 외부 웹 배포는 별도 결정.
+- 사용자 확인: 내 컴퓨터에서 먼저 실행. 2026-10-06 GitHub Public 제출과 외부 웹 배포를 요청했으며 이전 실습의 Vercel 방식을 선택했다.
 - 파일 입력→검증→집계→대시보드/보고서→편집→저장/템플릿/출력/지정 계정 공유 연결.
-- 실제 로컬 인증·SQLite 저장. 공유는 같은 서버의 지정 계정만 접근.
+- 실제 계정 인증·로컬 SQLite 저장, 외부 PostgreSQL 어댑터 준비. 공유는 같은 서버의 지정 계정만 접근. 외부 배포 실행 결과는 배포 안내 참고.
 - 초안은 규칙 기반. 외부 AI가 생성했다고 표시하지 않는다.
 - React·TypeScript·Express·Node 24. 흰색·초록·연두, 추천 틀 편집.
 - 지원 파일과 입력 계약에는 범위가 있다. 실제 회사 자료·운영 보안 검토는 별도.

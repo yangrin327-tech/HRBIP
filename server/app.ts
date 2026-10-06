@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { sqliteStore, type Store } from "./database";
 import { z } from "zod";
 import {
   workspaceSchema,
@@ -30,7 +31,11 @@ import { verifyCalculations } from "../shared/verification";
 import { exportVerification } from "./verification-export";
 import { FormatError } from "./office-xml";
 import { verifyOfficeOutput } from "./verify-output";
-
+import {
+  installTransfers,
+  streamLargeResponses,
+  TransferError,
+} from "./transfers";
 class HttpError extends Error {
   constructor(
     public status: number,
@@ -69,11 +74,18 @@ function cleanWorkspace(w: Workspace): Workspace {
   };
 }
 export function createApp(
-  db: DatabaseSync,
-  options: { origin?: string; production?: boolean } = {},
+  input: DatabaseSync | Store,
+  options: {
+    origin?: string;
+    production?: boolean;
+    publicDemo?: boolean;
+    trustProxyHops?: number;
+  } = {},
 ) {
+  const db: Store = "transaction" in input ? input : sqliteStore(input);
   const app = express();
   app.disable("x-powered-by");
+  if (options.trustProxyHops) app.set("trust proxy", options.trustProxyHops);
   app.use(
     helmet({
       contentSecurityPolicy: options.production
@@ -130,8 +142,10 @@ export function createApp(
     }
     next();
   });
-  const auth = (req: Request) => {
-    const u = currentUser(db, req);
+  streamLargeResponses(app);
+  installTransfers(app, db);
+  const auth = async (req: Request) => {
+    const u = await currentUser(db, req);
     if (!u)
       throw new HttpError(
         401,
@@ -139,12 +153,12 @@ export function createApp(
       );
     return u;
   };
-  const getWork = (req: Request, id: string, ownerOnly = false) => {
-    const u = auth(req),
-      row = db.prepare("SELECT * FROM works WHERE id=?").get(id);
+  const getWork = async (req: Request, id: string, ownerOnly = false) => {
+    const u = await auth(req),
+      row = await db.prepare("SELECT * FROM works WHERE id=?").get(id);
     if (!row) throw new HttpError(404, "작업이 없거나 삭제되었습니다.");
     const owner = row.owner === u.id,
-      shared = db
+      shared = await db
         .prepare("SELECT 1 FROM shares WHERE work_id=? AND user_id=?")
         .get(id, u.id);
     if (!owner && (ownerOnly || !shared))
@@ -159,8 +173,8 @@ export function createApp(
       w: workspaceSchema.parse(JSON.parse(String(row.payload))),
     };
   };
-  const getFormat = (id: string, owner: string) => {
-    const row = db
+  const getFormat = async (id: string, owner: string) => {
+    const row = await db
       .prepare("SELECT * FROM company_formats WHERE id=? AND owner=?")
       .get(id, owner);
     if (!row)
@@ -173,9 +187,9 @@ export function createApp(
       meta: JSON.parse(String(row.payload)) as CompanyFormat,
     };
   };
-  const checkFormats = (w: Workspace, owner: string) => {
+  const checkFormats = async (w: Workspace, owner: string) => {
     for (const [kind, id] of Object.entries(w.companyFormats || {}))
-      if (id && getFormat(id, owner).meta.format !== kind)
+      if (id && (await getFormat(id, owner)).meta.format !== kind)
         throw new HttpError(400, "양식 파일 형식이 맞지 않습니다.");
   };
   const formatUpload = z.object({
@@ -186,19 +200,20 @@ export function createApp(
     const body = formatUpload.parse(req.body);
     res.json(await inspectCompanyFormat(Buffer.from(body.data, "base64")));
   });
-  app.get("/api/company-formats", (req, res) => {
-    const u = auth(req);
+  app.get("/api/company-formats", async (req, res) => {
+    const u = await auth(req);
     res.json(
-      db
-        .prepare(
-          "SELECT payload FROM company_formats WHERE owner=? ORDER BY created DESC",
-        )
-        .all(u.id)
-        .map((row) => JSON.parse(String(row.payload))),
+      (
+        await db
+          .prepare(
+            "SELECT payload FROM company_formats WHERE owner=? ORDER BY created DESC",
+          )
+          .all(u.id)
+      ).map((row) => JSON.parse(String(row.payload))),
     );
   });
   app.post("/api/company-formats", async (req, res) => {
-    const u = auth(req),
+    const u = await auth(req),
       body = formatUpload
         .extend({
           title: z.string().trim().min(1).max(160),
@@ -211,7 +226,9 @@ export function createApp(
           }),
         })
         .parse(req.body);
-    const previous = body.previousId ? getFormat(body.previousId, u.id) : null;
+    const previous = body.previousId
+      ? await getFormat(body.previousId, u.id)
+      : null;
     const cleaned = await sanitizeCompanyFormat(
       Buffer.from(body.data, "base64"),
       body.bindings,
@@ -239,39 +256,41 @@ export function createApp(
       bindings: body.bindings,
       brand: body.brand,
     };
-    db.prepare("INSERT INTO company_formats VALUES(?,?,?,?,?,?,?,?)").run(
-      meta.id,
-      u.id,
-      meta.title,
-      meta.format,
-      meta.version,
-      meta.created,
-      JSON.stringify(meta),
-      cleaned.data,
-    );
+    await db
+      .prepare("INSERT INTO company_formats VALUES(?,?,?,?,?,?,?,?)")
+      .run(
+        meta.id,
+        u.id,
+        meta.title,
+        meta.format,
+        meta.version,
+        meta.created,
+        JSON.stringify(meta),
+        cleaned.data,
+      );
     res.status(201).json(meta);
   });
-  app.delete("/api/company-formats/:id", (req, res) => {
-    const u = auth(req),
+  app.delete("/api/company-formats/:id", async (req, res) => {
+    const u = await auth(req),
       id = String(req.params.id);
-    getFormat(id, u.id);
-    const used = db
-      .prepare("SELECT title,payload FROM works WHERE owner=?")
-      .all(u.id)
-      .some((row) =>
-        Object.values(
-          JSON.parse(String(row.payload)).companyFormats || {},
-        ).includes(id),
-      );
+    await getFormat(id, u.id);
+    const used = (
+      await db
+        .prepare("SELECT title,payload FROM works WHERE owner=?")
+        .all(u.id)
+    ).some((row) =>
+      Object.values(
+        JSON.parse(String(row.payload)).companyFormats || {},
+      ).includes(id),
+    );
     if (used)
       throw new HttpError(
         409,
         "저장한 작업에서 사용 중인 양식입니다. 해당 작업의 양식을 해제하고 저장한 뒤 삭제하세요.",
       );
-    db.prepare("DELETE FROM company_formats WHERE id=? AND owner=?").run(
-      id,
-      u.id,
-    );
+    await db
+      .prepare("DELETE FROM company_formats WHERE id=? AND owner=?")
+      .run(id, u.id);
     res.json({ ok: true });
   });
   app.post("/api/verification", (req, res) => {
@@ -282,8 +301,8 @@ export function createApp(
     const w = workspaceSchema.parse(req.body.workspace);
     res.type("xlsx").send(await exportVerification(w, aggregate(w)));
   });
-  app.post("/api/works/:id/verification", (req, res) => {
-    const { w, owner } = getWork(req, String(req.params.id));
+  app.post("/api/works/:id/verification", async (req, res) => {
+    const { w, owner } = await getWork(req, String(req.params.id));
     if (req.body.filters) w.filters = filtersSchema.parse(req.body.filters);
     const v = verifyCalculations(w, aggregate(w));
     if (!owner) {
@@ -295,9 +314,19 @@ export function createApp(
     res.json(v);
   });
   app.get("/api/health", (_req, res) =>
-    res.json({ ok: true, reportProvider: "rules", storage: "local" }),
+    res.json({
+      ok: true,
+      reportProvider: "rules",
+      storage: options.publicDemo ? "server" : "local",
+      publicDemo: !!options.publicDemo,
+    }),
   );
-  app.get("/api/me", (req, res) => res.json({ user: currentUser(db, req) }));
+  app.get("/api/me", async (req, res) =>
+    res.json({
+      user: await currentUser(db, req),
+      publicDemo: !!options.publicDemo,
+    }),
+  );
   const authLimit = rateLimit({
     windowMs: 15 * 60000,
     limit: 40,
@@ -307,19 +336,25 @@ export function createApp(
   });
   app.post("/api/auth/register", authLimit, async (req, res) => {
     const body = credentials.parse(req.body);
-    if (db.prepare("SELECT 1 FROM users WHERE username=?").get(body.username))
+    if (
+      await db
+        .prepare("SELECT 1 FROM users WHERE username=?")
+        .get(body.username)
+    )
       throw new HttpError(409, "이미 사용 중인 아이디입니다.");
     const user = { id: randomUUID(), username: body.username },
       password = await hashPassword(body.password);
-    db.prepare(
-      "INSERT INTO users(id,username,password,created) VALUES(?,?,?,?)",
-    ).run(user.id, user.username, password, new Date().toISOString());
-    startSession(db, user.id, req, res);
+    await db
+      .prepare(
+        "INSERT INTO users(id,username,password,created) VALUES(?,?,?,?)",
+      )
+      .run(user.id, user.username, password, new Date().toISOString());
+    await startSession(db, user.id, req, res);
     res.status(201).json({ user });
   });
   app.post("/api/auth/login", authLimit, async (req, res) => {
     const body = credentials.parse(req.body),
-      row = db
+      row = await db
         .prepare("SELECT * FROM users WHERE username=?")
         .get(body.username);
     const stored = row?.password
@@ -329,28 +364,28 @@ export function createApp(
     if (!row || !matches)
       throw new HttpError(401, "아이디 또는 비밀번호를 확인하세요.");
     const user = { id: String(row.id), username: String(row.username) };
-    startSession(db, user.id, req, res);
+    await startSession(db, user.id, req, res);
     res.json({ user });
   });
-  app.post("/api/auth/logout", (req, res) => {
-    endSession(db, req, res);
+  app.post("/api/auth/logout", async (req, res) => {
+    await endSession(db, req, res);
     res.json({ ok: true });
   });
-  app.get("/api/works", (req, res) => {
-    const u = auth(req);
+  app.get("/api/works", async (req, res) => {
+    const u = await auth(req);
     res.json(
-      db
+      await db
         .prepare(
           `SELECT w.id,w.title,w.updated,w.revision,w.owner=? AS owned,
-   (SELECT COUNT(*) FROM shares WHERE work_id=w.id) AS sharedCount,
-   (SELECT COUNT(*) FROM originals WHERE work_id=w.id) AS originalCount
+   (SELECT CAST(COUNT(*) AS INTEGER) FROM shares WHERE work_id=w.id) AS sharedCount,
+   (SELECT CAST(COUNT(*) AS INTEGER) FROM originals WHERE work_id=w.id) AS originalCount
    FROM works w WHERE w.owner=? OR EXISTS(SELECT 1 FROM shares s WHERE s.work_id=w.id AND s.user_id=?) ORDER BY w.updated DESC`,
         )
         .all(u.id, u.id, u.id),
     );
   });
-  app.get("/api/works/:id", (req, res) => {
-    const { row, w, owner } = getWork(req, String(req.params.id));
+  app.get("/api/works/:id", async (req, res) => {
+    const { row, w, owner } = await getWork(req, String(req.params.id));
     if (!owner) {
       res.json({
         id: row.id,
@@ -363,7 +398,7 @@ export function createApp(
       });
       return;
     }
-    const originals = db
+    const originals = await db
       .prepare(
         "SELECT id,name,length(data) AS size FROM originals WHERE work_id=?",
       )
@@ -377,7 +412,7 @@ export function createApp(
     });
   });
   app.post("/api/works", async (req, res) => {
-    const u = auth(req),
+    const u = await auth(req),
       body = z
         .object({
           workspace: workspaceSchema,
@@ -387,10 +422,10 @@ export function createApp(
         })
         .parse(req.body);
     const w = cleanWorkspace(body.workspace);
-    checkFormats(w, u.id);
+    await checkFormats(w, u.id);
     if (w.datasets.reduce((n, d) => n + d.rows.length, 0) > 30000)
       throw new HttpError(413, "전체 30,000행까지 저장할 수 있습니다.");
-    const existing = body.id ? getWork(req, body.id, true) : null;
+    const existing = body.id ? await getWork(req, body.id, true) : null;
     if (existing && body.revision !== Number(existing.row.revision))
       throw new HttpError(
         409,
@@ -408,35 +443,55 @@ export function createApp(
       originals.reduce((n, o) => n + o.buffer.length, 0) > 20 * 1024 * 1024
     )
       throw new HttpError(413, "원본은 파일당 10MB, 합계 20MB까지 보관합니다.");
-    db.exec("BEGIN");
-    try {
-      db.prepare(
-        "INSERT INTO works(id,owner,title,payload,updated,revision) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,payload=excluded.payload,updated=excluded.updated,revision=excluded.revision",
-      ).run(id, u.id, w.title, JSON.stringify(w), updated, revision);
-      if (!w.retainOriginals)
-        db.prepare("DELETE FROM originals WHERE work_id=?").run(id);
-      else if (body.originals !== undefined) {
-        db.prepare("DELETE FROM originals WHERE work_id=?").run(id);
-        for (const o of originals)
-          db.prepare(
-            "INSERT INTO originals(id,work_id,name,data) VALUES(?,?,?,?)",
-          ).run(o.id, id, o.name, o.buffer);
+    await db.transaction(async () => {
+      if (existing) {
+        const changed = await db
+          .prepare(
+            "UPDATE works SET title=?,payload=?,updated=?,revision=? WHERE id=? AND owner=? AND revision=?",
+          )
+          .run(
+            w.title,
+            JSON.stringify(w),
+            updated,
+            revision,
+            id,
+            u.id,
+            Number(existing.row.revision),
+          );
+        if (!changed.changes)
+          throw new HttpError(
+            409,
+            "다른 화면에서 이 작업이 변경되었습니다. 다시 열거나 새 작업으로 저장해 주세요.",
+          );
+      } else {
+        await db
+          .prepare(
+            "INSERT INTO works(id,owner,title,payload,updated,revision) VALUES(?,?,?,?,?,?)",
+          )
+          .run(id, u.id, w.title, JSON.stringify(w), updated, revision);
       }
-      db.exec("COMMIT");
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    }
+      if (!w.retainOriginals)
+        await db.prepare("DELETE FROM originals WHERE work_id=?").run(id);
+      else if (body.originals !== undefined) {
+        await db.prepare("DELETE FROM originals WHERE work_id=?").run(id);
+        for (const o of originals)
+          await db
+            .prepare(
+              "INSERT INTO originals(id,work_id,name,data) VALUES(?,?,?,?)",
+            )
+            .run(o.id, id, o.name, o.buffer);
+      }
+    });
     res.json({ id, revision, updated });
   });
-  app.delete("/api/works/:id", (req, res) => {
-    const { row } = getWork(req, String(req.params.id), true);
-    db.prepare("DELETE FROM works WHERE id=?").run(String(row.id));
+  app.delete("/api/works/:id", async (req, res) => {
+    const { row } = await getWork(req, String(req.params.id), true);
+    await db.prepare("DELETE FROM works WHERE id=?").run(String(row.id));
     res.json({ ok: true });
   });
-  app.get("/api/works/:id/originals/:originalId", (req, res) => {
-    getWork(req, String(req.params.id), true);
-    const row = db
+  app.get("/api/works/:id/originals/:originalId", async (req, res) => {
+    await getWork(req, String(req.params.id), true);
+    const row = await db
       .prepare("SELECT name,data FROM originals WHERE work_id=? AND id=?")
       .get(String(req.params.id), String(req.params.originalId));
     if (!row) throw new HttpError(404, "보관된 원본이 없습니다.");
@@ -447,8 +502,8 @@ export function createApp(
     );
     res.send(Buffer.from(row.data as Uint8Array));
   });
-  app.post("/api/works/:id/view", (req, res) => {
-    const { w, owner } = getWork(req, String(req.params.id));
+  app.post("/api/works/:id/view", async (req, res) => {
+    const { w, owner } = await getWork(req, String(req.params.id));
     const filters = filtersSchema.parse(req.body.filters || w.filters);
     w.filters = filters;
     const result = aggregate(w);
@@ -473,18 +528,18 @@ export function createApp(
       owner,
     });
   });
-  app.get("/api/works/:id/shares", (req, res) => {
-    getWork(req, String(req.params.id), true);
+  app.get("/api/works/:id/shares", async (req, res) => {
+    await getWork(req, String(req.params.id), true);
     res.json(
-      db
+      await db
         .prepare(
           "SELECT u.id,u.username FROM shares s JOIN users u ON u.id=s.user_id WHERE s.work_id=?",
         )
         .all(String(req.params.id)),
     );
   });
-  app.post("/api/works/:id/shares", (req, res) => {
-    const { u, w } = getWork(req, String(req.params.id), true),
+  app.post("/api/works/:id/shares", async (req, res) => {
+    const { u, w } = await getWork(req, String(req.params.id), true),
       target = z.object({ userId: z.string().uuid() }).parse(req.body).userId;
     const result = aggregate(w);
     if (w.report.basisKey !== result.key || w.report.reviewedKey !== result.key)
@@ -493,42 +548,41 @@ export function createApp(
         "현재 보고서를 최종 확인한 뒤 공유 대상을 추가하세요.",
       );
     if (target === u.id) throw new HttpError(400, "본인은 이미 소유자입니다.");
-    if (!db.prepare("SELECT 1 FROM users WHERE id=?").get(target))
+    if (!(await db.prepare("SELECT 1 FROM users WHERE id=?").get(target)))
       throw new HttpError(
         404,
         "가입된 계정 ID를 찾지 못했습니다. 상대방의 내 계정에서 ID를 확인하세요.",
       );
-    db.prepare("INSERT OR IGNORE INTO shares(work_id,user_id) VALUES(?,?)").run(
-      String(req.params.id),
-      target,
-    );
+    await db
+      .prepare("INSERT OR IGNORE INTO shares(work_id,user_id) VALUES(?,?)")
+      .run(String(req.params.id), target);
     res.json({ ok: true });
   });
-  app.delete("/api/works/:id/shares/:userId", (req, res) => {
-    getWork(req, String(req.params.id), true);
-    db.prepare("DELETE FROM shares WHERE work_id=? AND user_id=?").run(
-      String(req.params.id),
-      String(req.params.userId),
-    );
+  app.delete("/api/works/:id/shares/:userId", async (req, res) => {
+    await getWork(req, String(req.params.id), true);
+    await db
+      .prepare("DELETE FROM shares WHERE work_id=? AND user_id=?")
+      .run(String(req.params.id), String(req.params.userId));
     res.json({ ok: true });
   });
-  app.get("/api/templates", (req, res) => {
-    const u = auth(req);
+  app.get("/api/templates", async (req, res) => {
+    const u = await auth(req);
     res.json(
-      db
-        .prepare(
-          "SELECT id,title,payload,created FROM templates WHERE owner=? ORDER BY created DESC",
-        )
-        .all(u.id)
-        .map((r) => ({
-          ...r,
-          design: JSON.parse(String(r.payload)),
-          payload: undefined,
-        })),
+      (
+        await db
+          .prepare(
+            "SELECT id,title,payload,created FROM templates WHERE owner=? ORDER BY created DESC",
+          )
+          .all(u.id)
+      ).map((r) => ({
+        ...r,
+        design: JSON.parse(String(r.payload)),
+        payload: undefined,
+      })),
     );
   });
-  app.post("/api/templates", (req, res) => {
-    const u = auth(req),
+  app.post("/api/templates", async (req, res) => {
+    const u = await auth(req),
       body = z
         .object({
           title: z.string().trim().min(1).max(160),
@@ -536,18 +590,20 @@ export function createApp(
         })
         .parse(req.body),
       id = randomUUID();
-    db.prepare("INSERT INTO templates VALUES(?,?,?,?,?)").run(
-      id,
-      u.id,
-      body.title,
-      JSON.stringify(body.design),
-      new Date().toISOString(),
-    );
+    await db
+      .prepare("INSERT INTO templates VALUES(?,?,?,?,?)")
+      .run(
+        id,
+        u.id,
+        body.title,
+        JSON.stringify(body.design),
+        new Date().toISOString(),
+      );
     res.json({ id });
   });
-  app.delete("/api/templates/:id", (req, res) => {
-    const u = auth(req);
-    const result = db
+  app.delete("/api/templates/:id", async (req, res) => {
+    const u = await auth(req);
+    const result = await db
       .prepare("DELETE FROM templates WHERE id=? AND owner=?")
       .run(String(req.params.id), u.id);
     if (!result.changes)
@@ -561,19 +617,17 @@ export function createApp(
       limit: 20,
       message: { error: "기능 요청이 많습니다. 잠시 후 다시 시도해 주세요." },
     }),
-    (req, res) => {
+    async (req, res) => {
       const body = z
         .object({ message: z.string().trim().min(5).max(2000) })
         .parse(req.body);
       const id = randomUUID();
-      db.prepare("INSERT INTO requests VALUES(?,?,?)").run(
-        id,
-        body.message,
-        new Date().toISOString(),
-      );
+      await db
+        .prepare("INSERT INTO requests VALUES(?,?,?)")
+        .run(id, body.message, new Date().toISOString());
       res.status(201).json({
         id,
-        message: "이 PC의 요청함에 저장했습니다. 외부로 전송하지 않았습니다.",
+        message: "HRBIP의 기능 요청함에 저장했습니다.",
       });
     },
   );
@@ -624,7 +678,7 @@ export function createApp(
             401,
             "회사 양식 내보내기는 로그인 후 이용하세요.",
           );
-        const saved = getFormat(formatId, owner);
+        const saved = await getFormat(formatId, owner);
         appliedMeta = saved.meta;
         const applied = await applyCompanyFormat(
           saved.data,
@@ -660,11 +714,11 @@ export function createApp(
       res,
       String(req.params.format),
       w,
-      currentUser(db, req)?.id,
+      (await currentUser(db, req))?.id,
     );
   });
   app.post("/api/works/:id/export/:format", exportLimit, async (req, res) => {
-    const { w, owner, row } = getWork(req, String(req.params.id));
+    const { w, owner, row } = await getWork(req, String(req.params.id));
     if (req.body.filters) w.filters = filtersSchema.parse(req.body.filters);
     const result = aggregate(w);
     if (!owner && w.report.basisKey !== result.key)
@@ -702,7 +756,7 @@ export function createApp(
         });
         return;
       }
-      if (err instanceof HttpError) {
+      if (err instanceof HttpError || err instanceof TransferError) {
         res.status(err.status).json({ error: err.message });
         return;
       }
@@ -716,7 +770,10 @@ export function createApp(
           .json({ error: "요청 내용을 읽지 못했습니다. 다시 시도하세요." });
         return;
       }
-      const error = err as { status?: number; message?: string };
+      const error = err as {
+        status?: number;
+        message?: string;
+      };
       if (error.status === 413) {
         res
           .status(413)

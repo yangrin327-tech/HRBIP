@@ -18,6 +18,9 @@ export function openStore(
  CREATE TABLE IF NOT EXISTS templates(id TEXT PRIMARY KEY,owner TEXT NOT NULL REFERENCES users(id),title TEXT NOT NULL,payload TEXT NOT NULL,created TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,body TEXT NOT NULL,created TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS company_formats(id TEXT PRIMARY KEY,owner TEXT NOT NULL REFERENCES users(id),title TEXT NOT NULL,format TEXT NOT NULL,version INTEGER NOT NULL,created TEXT NOT NULL,payload TEXT NOT NULL,data BLOB NOT NULL);
+ CREATE TABLE IF NOT EXISTS transfers(id TEXT PRIMARY KEY,subject TEXT NOT NULL,path TEXT NOT NULL,bytes INTEGER NOT NULL,expires INTEGER NOT NULL,claimed INTEGER NOT NULL DEFAULT 0);
+ CREATE TABLE IF NOT EXISTS transfer_parts(transfer_id TEXT NOT NULL REFERENCES transfers(id) ON DELETE CASCADE,part INTEGER NOT NULL,data BLOB NOT NULL,PRIMARY KEY(transfer_id,part));
+ CREATE INDEX IF NOT EXISTS transfers_expiry ON transfers(expires);
  `);
   return db;
 }

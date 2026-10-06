@@ -79,7 +79,7 @@ export function CompanyFormats({
       {!loggedIn && (
         <Notice>
           <p>
-            양식은 로그인한 계정의 이 PC 저장소에 보관해요. 파일 검사와 연결
+            양식은 로그인한 계정의 HRBIP 저장소에 보관해요. 파일 검사와 연결
             확인은 먼저 할 수 있어요.
           </p>
           <Button onClick={onLogin}>로그인하고 양식 저장하기</Button>

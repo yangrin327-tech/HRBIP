@@ -3,12 +3,16 @@ import { existsSync } from "node:fs";
 import { openStore } from "./store";
 import { createApp } from "./app";
 import express from "express";
+import { serverConfig } from "./config";
+import { postgresStore, sqliteStore } from "./database";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 else if (existsSync(".env")) process.loadEnvFile(".env");
-const port = Number(process.env.PORT || 4173),
-  host = process.env.HOST || "127.0.0.1",
-  production = process.argv.includes("--production");
-const app = createApp(openStore(), { production });
+const { port, host, origin, publicDemo, trustProxyHops } = serverConfig();
+const production = process.argv.includes("--production");
+const db = process.env.DATABASE_URL
+  ? postgresStore(process.env.DATABASE_URL)
+  : sqliteStore(openStore());
+const app = createApp(db, { production, origin, publicDemo, trustProxyHops });
 if (production) {
   app.use(express.static(resolve("dist")));
   app.get("/{*path}", (_req, res) => res.sendFile(resolve("dist/index.html")));
@@ -31,4 +35,15 @@ const server = app.listen(port, host, () =>
       ")",
   ),
 );
-process.on("SIGTERM", () => server.close(() => process.exit(0)));
+let stopping = false;
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  server.close(async () => {
+    await db.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
