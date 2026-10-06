@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -35,7 +35,20 @@ import { aggregate, draft, recommendedCards } from "../shared/analytics";
 import { sampleWorkspace } from "../shared/sample";
 import { api, download, ApiError, setGuestRequests } from "./api";
 import { GuestContext, useGuest, type GuestFormat } from "./guest";
-import type { Original } from "./files";
+import type { Original, RawSheet } from "./files";
+import {
+  readBrowserSettings,
+  readBrowserWork,
+  writeBrowserWork,
+  listBrowserWorks,
+  listBrowserTemplates,
+  writeBrowserTemplate,
+  deleteBrowserTemplate,
+  deleteBrowserWork,
+  writeBrowserFormats,
+  flushBrowserWrites,
+  type BrowserWork,
+} from "./browser-store";
 import { Button, Notice, Modal, PageTitle } from "./ui";
 import { DataInput } from "./DataInput";
 import { DataReview } from "./DataReview";
@@ -66,6 +79,10 @@ export default function App() {
   const [publicDemo, setPublicDemo] = useState(false);
   const [guestMode, setGuestMode] = useState(true);
   const [guestFormats, setGuestFormats] = useState<GuestFormat[]>([]);
+  const [pendingSheets, setPendingSheets] = useState<RawSheet[]>([]);
+  const [browserReady, setBrowserReady] = useState(false);
+  const [storageError, setStorageError] = useState("");
+  const saveSequence = useRef(0);
   const [returnToSaved, setReturnToSaved] = useState(false);
   const [reusePlan, setReusePlan] = useState<ReusePlan | null>(null);
   const [workId, setWorkId] = useState(""),
@@ -100,6 +117,95 @@ export default function App() {
     [w, route, sharedResult],
   );
   useEffect(() => {
+    if (!accountReady || !guestMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await readBrowserSettings();
+        if (cancelled) return;
+        setGuestFormats(settings.formats);
+        if (
+          settings.activeWork &&
+          !new URLSearchParams(location.search).has("share")
+        ) {
+          const saved = await readBrowserWork(settings.activeWork);
+          if (cancelled) return;
+          restoreBrowserWork(saved);
+        }
+      } catch (error) {
+        if (!cancelled) setStorageError((error as Error).message);
+      } finally {
+        if (!cancelled) setBrowserReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountReady, guestMode]);
+  useEffect(() => {
+    if (!guestMode || !browserReady || !workId || route === "shared") return;
+    const sequence = ++saveSequence.current;
+    setDirty(true);
+    void persistBrowserWork()
+      .then(() => {
+        if (sequence !== saveSequence.current) return;
+        setDirty(false);
+        setStorageError("");
+      })
+      .catch((error) => {
+        if (sequence === saveSequence.current)
+          setStorageError((error as Error).message);
+      });
+  }, [
+    guestMode,
+    browserReady,
+    workId,
+    w,
+    pendingSheets,
+    originals,
+    reusePlan,
+    route,
+  ]);
+  function persistBrowserWork(id = workId) {
+    const savedRoute = ["input", "repeat", "verify", "result"].includes(route)
+      ? route
+      : w.datasets.length
+        ? w.basisConfirmed
+          ? "result"
+          : "verify"
+        : "input";
+    return writeBrowserWork({
+      id,
+      workspace: w,
+      route: savedRoute,
+      sheets: pendingSheets,
+      originals: w.retainOriginals ? originals : [],
+      reusePlan,
+    });
+  }
+  function restoreBrowserWork(saved: BrowserWork) {
+    rawSetW(saved.workspace);
+    setWorkId(saved.id);
+    setRevision(saved.revision);
+    setPendingSheets(saved.sheets || []);
+    setOriginals(saved.originals || []);
+    setOriginalMeta([]);
+    setReusePlan(saved.reusePlan || null);
+    setSharedId("");
+    setSharedResult(null);
+    setDirty(false);
+    setRoute(
+      ["input", "repeat", "verify", "result"].includes(saved.route)
+        ? saved.route
+        : "home",
+    );
+  }
+  async function persistFormats(formats: GuestFormat[]) {
+    await flushBrowserWrites();
+    await writeBrowserFormats(formats);
+    setGuestFormats(formats);
+  }
+  useEffect(() => {
     api("/me")
       .then((data) => {
         setUser(data.user);
@@ -117,14 +223,14 @@ export default function App() {
   }, []);
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (dirty && w.datasets.length) {
+      if (dirty && (w.datasets.length || pendingSheets.length)) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty, w.datasets.length]);
+  }, [dirty, w.datasets.length, pendingSheets.length]);
   function navigate(next: string) {
     setRoute(next);
     setError("");
@@ -140,6 +246,11 @@ export default function App() {
       setAuthOpen(true);
   }
   function canReplace() {
+    if (guestMode)
+      return (
+        !storageError ||
+        confirm("자동 저장에 실패했어요. 저장하지 못한 작업을 바꿀까요?")
+      );
     return (
       !dirty ||
       !w.datasets.length ||
@@ -170,7 +281,8 @@ export default function App() {
     rawSetW(next);
     setOriginals([]);
     setOriginalMeta([]);
-    setWorkId("");
+    setPendingSheets([]);
+    setWorkId(guestMode ? crypto.randomUUID() : "");
     setRevision(0);
     setDirty(next.sample);
     setSampleListOpen(false);
@@ -201,7 +313,9 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
-      const data = await api("/works/" + item.id);
+      const data = guestMode
+        ? await readBrowserWork(item.id)
+        : await api("/works/" + item.id);
       repeatWorkspace(data.workspace);
     } catch (e) {
       handleError(e);
@@ -210,7 +324,7 @@ export default function App() {
     }
   }
   async function loadSaved() {
-    if (!user) {
+    if (!guestMode && !user) {
       setReturnToSaved(true);
       setAuthOpen(true);
       return;
@@ -222,8 +336,20 @@ export default function App() {
     setError("");
     try {
       const [a, b] = await Promise.all([
-        api<Stored[]>("/works"),
-        api<Template[]>("/templates"),
+        guestMode
+          ? listBrowserWorks().then((items) =>
+              items.map((item) => ({
+                id: item.id,
+                title: item.workspace.title,
+                updated: item.updated,
+                owned: 1,
+                revision: item.revision,
+                sharedCount: 0,
+                originalCount: item.originals.length,
+              })),
+            )
+          : api<Stored[]>("/works"),
+        guestMode ? listBrowserTemplates() : api<Template[]>("/templates"),
       ]);
       setStored(a);
       setTemplates(b);
@@ -235,6 +361,22 @@ export default function App() {
     }
   }
   async function save(asNew = false) {
+    if (guestMode) {
+      const sequence = ++saveSequence.current;
+      setDirty(true);
+      try {
+        const id = asNew || !workId ? crypto.randomUUID() : workId;
+        await persistBrowserWork(id);
+        if (id !== workId) setWorkId(id);
+        if (sequence === saveSequence.current) setDirty(false);
+        setStorageError("");
+        notify("데이터와 편집 내용을 이 브라우저에 저장했어요.");
+        return id;
+      } catch (error) {
+        setStorageError((error as Error).message);
+        return null;
+      }
+    }
     if (!user) {
       setAuthOpen(true);
       notify("로그인 후 저장을 다시 눌러 주세요. 현재 작성 내용은 유지돼요.");
@@ -267,6 +409,10 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
+      if (guestMode) {
+        restoreBrowserWork(await readBrowserWork(item.id));
+        return;
+      }
       if (!item.owned) {
         await openShared(item.id);
         return;
@@ -393,7 +539,7 @@ export default function App() {
       format.toUpperCase() +
         " 파일을 만들었어요." +
         (guestMode
-          ? " 다운로드 폴더에서 확인하세요. 현재 작업은 서버에 저장되지 않아요."
+          ? " 다운로드 폴더에서 확인하세요. 작업은 이 브라우저에 자동 저장돼요."
           : !user
             ? " 작업 목록에 남기려면 로그인 후 저장해 주세요."
             : " 작업도 저장했어요."),
@@ -438,12 +584,20 @@ export default function App() {
     }
   }
   const shared = route === "shared";
+  if (!accountReady || (guestMode && !browserReady))
+    return (
+      <main className="panel" role="status">
+        저장한 작업을 불러오는 중이에요…
+      </main>
+    );
   return (
     <GuestContext.Provider
       value={{
         enabled: guestMode,
         formats: guestFormats,
-        setFormats: setGuestFormats,
+        setFormats: persistFormats,
+        sheets: pendingSheets,
+        setSheets: setPendingSheets,
       }}
     >
       <div className="app-shell">
@@ -507,7 +661,7 @@ export default function App() {
                 <BarChart3 size={19} />
                 인사현황 보고서
               </button>
-              {!guestMode && (
+              {
                 <button
                   className={route === "saved" ? "selected" : ""}
                   onClick={loadSaved}
@@ -515,7 +669,7 @@ export default function App() {
                   <FolderOpen size={19} />
                   저장한 작업
                 </button>
-              )}
+              }
             </nav>
             <div className="sidebar-bottom">
               <span className="round-icon">
@@ -550,8 +704,9 @@ export default function App() {
             {guestMode ? (
               <Notice>
                 로그인 없이 내 파일 또는 샘플로 시작하세요. 작업과 회사 양식은
-                현재 탭에서만 유지되고, 새로고침하거나 탭을 닫으면 사라져요.
-                필요한 결과는 PDF·PPT·Excel로 내려받으세요.
+                이 브라우저에 자동 저장돼요. 새로고침하거나 다시 방문해도
+                ‘저장한 작업’에서 이어갈 수 있어요. 다른 기기·브라우저에는
+                동기화되지 않으며, 브라우저 데이터를 지우면 삭제돼요.
               </Notice>
             ) : (
               publicDemo && (
@@ -562,6 +717,13 @@ export default function App() {
                   보안·운영 검증은 아직 완료하지 않았어요.
                 </Notice>
               )
+            )}
+            {storageError && (
+              <Notice tone="error">
+                {storageError}
+                <Button onClick={() => save()}>저장 다시 시도</Button>
+                <Button onClick={() => save(true)}>사본 저장</Button>
+              </Notice>
             )}
             {error && (
               <Notice tone="error">
@@ -711,7 +873,7 @@ export default function App() {
                           "03",
                           "출력 · 보고할 자료를 완성해요",
                           guestMode
-                            ? "문장과 차트를 미리 보고 PDF·PPT·Excel로 내려받으세요. 작업은 현재 탭에서만 유지돼요."
+                            ? "문장과 차트를 미리 보고 PDF·PPT·Excel로 내려받으세요. 작업과 수정 내용은 이 브라우저에 자동 저장돼요."
                             : "문장과 차트를 미리 보고 PDF·PPT·Excel로 출력하세요. 다음 보고는 저장한 설정으로 시작해요.",
                         ],
                       ].map(([n, t, d]) => (
@@ -790,7 +952,11 @@ export default function App() {
                   <div className="save-state" role="status">
                     <strong>
                       {guestMode
-                        ? "현재 탭에서 작업 중이에요"
+                        ? storageError
+                          ? "자동 저장에 실패했어요"
+                          : dirty
+                            ? "변경사항을 저장하고 있어요…"
+                            : "이 브라우저에 자동 저장했어요"
                         : workId
                           ? dirty
                             ? "저장 후 변경사항이 있어요"
@@ -799,7 +965,7 @@ export default function App() {
                     </strong>
                     <span>
                       {guestMode
-                        ? "새로고침하거나 탭을 닫기 전에 ‘최종 확인·내보내기’에서 필요한 결과를 다운로드하세요."
+                        ? "‘저장한 작업’에서 다시 열 수 있어요. 다른 기기에서 보관하려면 결과를 파일로 내려받으세요."
                         : workId && !dirty
                           ? "워크스페이스의 ‘저장한 작업’에서 다시 열 수 있어요."
                           : !user
@@ -827,7 +993,7 @@ export default function App() {
                     if (canReplace()) repeatWorkspace(w);
                   }}
                   onTemplate={() => {
-                    if (!user) {
+                    if (!guestMode && !user) {
                       setAuthOpen(true);
                       return;
                     }
@@ -842,7 +1008,7 @@ export default function App() {
                 />
               </>
             )}
-            {!guestMode && route === "saved" && (
+            {route === "saved" && (
               <>
                 <PageTitle
                   eyebrow="SAVED WORKSPACE"
@@ -856,7 +1022,11 @@ export default function App() {
                 />
                 <section className="panel">
                   <div className="section-heading">
-                    <h2>저장한 작업·공유받은 보고서</h2>
+                    <h2>
+                      {guestMode
+                        ? "이 브라우저에 저장한 작업"
+                        : "저장한 작업·공유받은 보고서"}
+                    </h2>
                     <span className="tag">{stored.length}</span>
                   </div>
                   {!stored.length ? (
@@ -915,14 +1085,24 @@ export default function App() {
                                   )
                                     return;
                                   try {
-                                    await api(
-                                      "/works/" + item.id,
-                                      "DELETE",
-                                      {},
-                                    );
+                                    if (guestMode)
+                                      await deleteBrowserWork(item.id);
+                                    else
+                                      await api(
+                                        "/works/" + item.id,
+                                        "DELETE",
+                                        {},
+                                      );
                                     if (workId === item.id) {
                                       setWorkId("");
                                       setRevision(0);
+                                      if (guestMode) {
+                                        rawSetW(emptyWorkspace());
+                                        setPendingSheets([]);
+                                        setOriginals([]);
+                                        setReusePlan(null);
+                                        setDirty(false);
+                                      }
                                     }
                                     await loadSaved();
                                   } catch (e) {
@@ -967,11 +1147,14 @@ export default function App() {
                               onClick={async () => {
                                 if (confirm("이 템플릿을 삭제할까요?"))
                                   try {
-                                    await api(
-                                      "/templates/" + t.id,
-                                      "DELETE",
-                                      {},
-                                    );
+                                    if (guestMode)
+                                      await deleteBrowserTemplate(t.id);
+                                    else
+                                      await api(
+                                        "/templates/" + t.id,
+                                        "DELETE",
+                                        {},
+                                      );
                                     await loadSaved();
                                   } catch (e) {
                                     handleError(e);
@@ -991,9 +1174,10 @@ export default function App() {
                   )}
                 </section>
                 <Notice>
-                  저장 위치: 이 프로젝트의 .data 폴더. 목록의 삭제 버튼으로 해당
-                  작업의 분석 자료·원본·공유 권한을 함께 삭제해요. 별도로 만든
-                  출력 파일과 외부 백업은 직접 삭제해야 해요.
+                  {guestMode
+                    ? "저장 위치: 지금 사용하는 브라우저의 IndexedDB. 이 사이트에 다시 방문하면 복원돼요. 목록에서 작업을 삭제할 수 있고, 브라우저 데이터를 지우면 이곳의 작업과 양식도 삭제돼요. 다른 기기와 자동 동기화되지 않아요."
+                    : "저장 위치: 이 프로젝트의 .data 폴더. 작업을 삭제하면 분석 자료·원본·공유 권한도 삭제돼요."}
+                  별도로 내려받은 출력 파일은 직접 삭제하세요.
                 </Notice>
               </>
             )}
@@ -1102,7 +1286,7 @@ export default function App() {
           </Modal>
         )}
         {requestOpen && <RequestModal onClose={() => setRequestOpen(false)} />}
-        {!guestMode && templateOpen && (
+        {templateOpen && (
           <Modal
             title="구성을 템플릿으로 저장"
             onClose={() => setTemplateOpen(false)}
@@ -1125,10 +1309,17 @@ export default function App() {
               disabled={!templateTitle.trim()}
               onClick={async () => {
                 try {
-                  await api("/templates", "POST", {
-                    title: templateTitle,
-                    design: w.design,
-                  });
+                  if (guestMode)
+                    await writeBrowserTemplate({
+                      id: crypto.randomUUID(),
+                      title: templateTitle.trim(),
+                      design: w.design,
+                    });
+                  else
+                    await api("/templates", "POST", {
+                      title: templateTitle,
+                      design: w.design,
+                    });
                   setTemplateOpen(false);
                   notify("템플릿을 저장했어요.");
                 } catch (e) {

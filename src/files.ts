@@ -4,6 +4,7 @@ import { recommendMapping } from "../shared/import";
 export type RawSheet = {
   id: string;
   fileId: string;
+  fileBytes?: number;
   name: string;
   matrix: string[][];
   headerRow: number;
@@ -120,6 +121,7 @@ export async function parseFile(
       .map((s, i) => ({
         id: id + "-" + i,
         fileId: id,
+        fileBytes: file.size,
         ...s,
         headerRow: 0,
         selected: true,

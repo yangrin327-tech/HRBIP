@@ -71,7 +71,7 @@ export function CompanyFormats({
         " v" +
         f.version +
         (guest.enabled
-          ? " 적용됨. 현재 탭에서만 유지돼요. 필요한 결과를 내보내세요."
+          ? " 적용됨. 양식과 연결을 이 브라우저에 저장했어요."
           : " 적용됨. 작업 저장으로 이 선택도 보관하세요."),
     );
   };
@@ -79,7 +79,7 @@ export function CompanyFormats({
     <Modal title="회사 양식 등록·적용" onClose={onClose} wide>
       <p>
         {guest.enabled
-          ? "PPTX·Excel 양식을 연결하고 현재 보고서에 적용하세요. 이 탭 안에서는 연결을 다시 사용할 수 있어요. 새로고침·탭 종료 시 양식과 연결도 사라져요. 검사·출력은 서버에서 일회성으로 처리하며 파일을 보관하지 않아요."
+          ? "PPTX·Excel 양식을 연결하고 현재 보고서에 적용하세요. 양식과 연결은 이 브라우저에 저장하고 다음 보고에도 재사용해요. 검사·출력은 서버에서 일회성으로 처리하며 서버에 파일을 보관하지 않아요."
           : "처음 한 번 위치를 연결하면, 다음 보고서도 회사 양식으로 만들 수 있어요. PPTX부터 등록하고 Excel 양식도 함께 저장하세요."}
       </p>
       {!guest.enabled && !loggedIn && (
@@ -94,7 +94,11 @@ export function CompanyFormats({
       {error && <Notice tone="error">{error}</Notice>}
       {message && <Notice tone="success">{message}</Notice>}
       <section className="format-library">
-        <h3>{guest.enabled ? "현재 탭의 회사 양식" : "저장한 회사 양식"}</h3>
+        <h3>
+          {guest.enabled
+            ? "이 브라우저에 저장한 회사 양식"
+            : "저장한 회사 양식"}
+        </h3>
         {!formats.length && (
           <p className="muted">
             등록한 양식이 없어요. 아래에서 회사 파일을 선택하세요.
@@ -146,13 +150,13 @@ export function CompanyFormats({
                     if (
                       !confirm(
                         guest.enabled
-                          ? "현재 탭에서 이 양식과 연결을 제거할까요? 다시 사용하려면 파일을 선택해야 해요."
+                          ? "저장한 양식과 연결을 삭제할까요? 사용 중인 작업이 있으면 먼저 해당 작업에서 양식을 해제하세요."
                           : "이 양식을 삭제할까요? 저장한 작업이 사용 중이면 삭제할 수 없어요.",
                       )
                     )
                       return;
                     if (guest.enabled)
-                      guest.setFormats(
+                      await guest.setFormats(
                         guest.formats.filter((v) => v.meta.id !== f.id),
                       );
                     else await api("/company-formats/" + f.id, "DELETE");
@@ -177,7 +181,7 @@ export function CompanyFormats({
           ))}
           <p className="small">
             {guest.enabled
-              ? "양식 파일과 연결은 현재 탭의 메모리에만 있어요. 다른 방문자나 다음 방문에는 전달되지 않아요."
+              ? "양식 파일과 연결은 이 브라우저의 IndexedDB에 저장해요. 다음 방문에 재사용할 수 있으며 다른 기기나 방문자와 공유하지 않아요."
               : "원본 분석 파일 보관 선택과 별개로, 정리한 양식 파일과 연결 설정을 계정별로 보관해요. 새 버전은 기존 작업의 양식을 바꾸지 않아요."}
           </p>
         </details>
@@ -427,7 +431,7 @@ export function CompanyFormats({
                   );
                   if (previous)
                     prepared.meta.version = previous.meta.version + 1;
-                  guest.setFormats([...guest.formats, prepared]);
+                  await guest.setFormats([...guest.formats, prepared]);
                   apply(prepared.meta);
                   setInspection(null);
                   setFile(null);

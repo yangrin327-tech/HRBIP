@@ -20,7 +20,7 @@ test("public mode exposes no account actions; sample, edits, exports and externa
   await expect(
     page.getByText("가입 없이 바로 사용", { exact: true }),
   ).toBeVisible();
-  for (const label of ["로그인", "저장한 작업"])
+  for (const label of ["로그인"])
     await expect(
       page.getByRole("button", { name: label, exact: true }),
     ).toHaveCount(0);
@@ -38,12 +38,12 @@ test("public mode exposes no account actions; sample, edits, exports and externa
   await page
     .getByRole("button", { name: "샘플로 체험하기", exact: true })
     .click();
-  for (const label of ["저장", "공유", "템플릿 저장"])
+  for (const label of ["공유"])
     await expect(
       page.getByRole("button", { name: label, exact: true }),
     ).toHaveCount(0);
   await expect(page.locator(".save-state")).toContainText(
-    "현재 탭에서 작업 중",
+    "이 브라우저에 자동 저장했어요",
   );
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page
@@ -87,7 +87,7 @@ test("public mode exposes no account actions; sample, edits, exports and externa
   await page.screenshot({ path: "artifacts/verification/guest-mobile.png" });
 });
 
-test("guest company PPTX and XLSX stay in the tab, export editable values, and disappear on reload", async ({
+test("guest company PPTX and XLSX export editable values and persist bindings after reload", async ({
   page,
 }) => {
   await page.goto("/");
@@ -173,16 +173,17 @@ test("guest company PPTX and XLSX stay in the tab, export editable values, and d
     }
   }
   page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
   await page.reload();
   await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
+    .getByRole("button", { name: "회사 양식 등록·적용", exact: false })
     .click();
-  await page
-    .getByRole("button", { name: "회사 양식 등록·적용", exact: true })
-    .click();
+  await expect(modal.getByLabel("pptx 회사 양식 선택")).not.toHaveValue("");
+  await expect(modal.getByLabel("xlsx 회사 양식 선택")).not.toHaveValue("");
   await expect(
     modal.getByText("등록한 양식이 없어요. 아래에서 회사 파일을 선택하세요."),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("old share URLs do not request account data or prompt sign-in", async ({

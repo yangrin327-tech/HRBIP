@@ -121,16 +121,18 @@ export function Results({
         }
         actions={
           <>
-            {!readOnly && !guest.enabled && (
+            {!readOnly && (
               <>
                 <Button busy={busy} onClick={onSave}>
                   <Save size={17} />
                   저장
                 </Button>
-                <Button onClick={onShare}>
-                  <Share2 size={17} />
-                  공유
-                </Button>
+                {!guest.enabled && (
+                  <Button onClick={onShare}>
+                    <Share2 size={17} />
+                    공유
+                  </Button>
+                )}
               </>
             )}
             <Button variant="primary" onClick={() => setExporting(true)}>
@@ -277,12 +279,12 @@ export function Results({
         </div>
         {!readOnly && (
           <div className="actions">
-            {!guest.enabled && (
+            {
               <Button onClick={onTemplate}>
                 <BookmarkPlus size={16} />
                 템플릿 저장
               </Button>
-            )}
+            }
             <Button
               onClick={() => setEditing(!editing)}
               aria-expanded={editing}

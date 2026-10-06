@@ -1,4 +1,10 @@
-import { createContext, useContext } from "react";
+import {
+  createContext,
+  useContext,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import type { RawSheet } from "./files";
 import type { CompanyFormat, Binding } from "../shared/company-format";
 
 export type GuestFormat = {
@@ -12,10 +18,12 @@ export type GuestFormat = {
     brand: { font: string; color: string };
   };
 };
-// Memory only: no localStorage, IndexedDB, cookies or server-backed uploads.
+// Guest work is stored on this browser; server processing remains stateless.
 export const GuestContext = createContext({
   enabled: true,
   formats: [] as GuestFormat[],
-  setFormats: (_formats: GuestFormat[]) => {},
+  setFormats: async (_formats: GuestFormat[]) => {},
+  sheets: [] as RawSheet[],
+  setSheets: (() => {}) as Dispatch<SetStateAction<RawSheet[]>>,
 });
 export const useGuest = () => useContext(GuestContext);

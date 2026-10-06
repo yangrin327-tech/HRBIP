@@ -39,10 +39,12 @@ export function DataInput({
   repeating = false,
 }: Props) {
   const guest = useGuest();
-  const [sheets, setSheets] = useState<RawSheet[]>([]),
+  const [localSheets, setLocalSheets] = useState<RawSheet[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [encoding, setEncoding] = useState<"utf-8" | "euc-kr">("utf-8");
+  const sheets = guest.enabled ? guest.sheets : localSheets;
+  const setSheets = guest.enabled ? guest.setSheets : setLocalSheets;
   async function upload(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
@@ -51,7 +53,13 @@ export function DataInput({
     try {
       if (
         files.reduce((n, f) => n + f.size, 0) +
-          originals.reduce((n, o) => n + o.data.length * 0.75, 0) >
+          (originals.length
+            ? originals.reduce((n, o) => n + o.data.length * 0.75, 0)
+            : Array.from(
+                new Map(
+                  sheets.map((s) => [s.fileId, s.fileBytes || 0]),
+                ).values(),
+              ).reduce((a, b) => a + b, 0)) >
         20 * 1024 * 1024
       )
         throw new Error(
@@ -366,17 +374,35 @@ export function DataInput({
           {guest.enabled ? (
             <>
               <p>
-                파일 읽기와 대시보드 분석은 브라우저 메모리에서 진행해요. 계산
+                파일 읽기와 대시보드 분석은 브라우저에서 진행해요. 계산
                 검증·내보내기 시 분석 자료를, 회사 양식 검사·적용 시 양식 파일을
                 서버에 보내 일회성으로 처리해요. HRBIP 데이터베이스나 파일
                 저장소에는 보관하지 않아요.
               </p>
               <p>
-                작업과 양식 연결은 현재 탭에서만 유지돼요. 새로고침·탭 종료 전에
-                결과를 다운로드하세요. 포트폴리오 시연에는 가상·비식별 자료를
-                사용해 주세요. 호스팅 서비스의 접속·오류 로그는 별도이며, 실제
-                인사자료에 대한 보안·운영 검증은 완료하지 않았어요.
+                작업 데이터·편집 내용·양식 연결은 이 브라우저에 자동 저장해요.
+                새로고침과 다음 방문에도 이어서 사용할 수 있어요. 브라우저
+                데이터 삭제 시 함께 삭제되고 다른 기기에 동기화되지 않아요.
+                포트폴리오 시연에는 가상·비식별 자료를 사용해 주세요. 호스팅
+                서비스의 접속·오류 로그는 별도이며, 실제 인사자료에 대한
+                보안·운영 검증은 완료하지 않았어요.
               </p>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={w.retainOriginals}
+                  onChange={(e) =>
+                    setW((v) => {
+                      v.retainOriginals = e.target.checked;
+                    })
+                  }
+                />
+                업로드 원본 파일도 이 브라우저에 보관하기
+              </label>
+              <small>
+                기본은 원본 파일 미보관이에요. 분석 데이터와 선택한 시트의
+                작업용 복사본은 자동 저장해요.
+              </small>
               <small>
                 서버 전송은 압축 후 4MB, 압축 전 40MB까지 지원해요. 넘으면 자료
                 분할이나 양식 이미지 축소를 안내하며 임시 저장소로 우회하지
