@@ -25,6 +25,7 @@ type Props = {
   onNext: () => void;
   onSample: () => void;
   onSampleList: () => void;
+  repeating?: boolean;
 };
 export function DataInput({
   w,
@@ -34,6 +35,7 @@ export function DataInput({
   onNext,
   onSample,
   onSampleList,
+  repeating = false,
 }: Props) {
   const [sheets, setSheets] = useState<RawSheet[]>([]),
     [busy, setBusy] = useState(false),
@@ -95,7 +97,22 @@ export function DataInput({
       const prepared = prepareHrWorkbook(sheets);
       setW((v) => {
         const retain = v.retainOriginals;
-        Object.assign(v, prepared, { retainOriginals: retain });
+        const repeatSettings = repeating
+          ? {
+              title: v.title,
+              filters: v.filters,
+              design: v.design,
+              exitInclusive: v.exitInclusive,
+              report: {
+                generated: "",
+                notes: "",
+                basisKey: "",
+                reviewedKey: "",
+              },
+              audit: [...v.audit, ...prepared.audit],
+            }
+          : {};
+        Object.assign(v, prepared, { retainOriginals: retain }, repeatSettings);
       });
       setSheets([]);
       onNext();
@@ -111,6 +128,78 @@ export function DataInput({
         description="쓰고 있는 파일을 그대로 가져오세요. 필요한 항목은 다음 단계에서 연결해요."
       />
       <Steps current={0} />
+      {repeating && (
+        <Notice>
+          새 자료로 반복 보고 중이에요. 이번 보고에 필요한 파일을 올려주세요.
+          기존 직원 정보와 보고 문장은 비워두었어요. 다음 단계에서 지난 설정을
+          연결하고 다시 검증해요.
+        </Notice>
+      )}
+      <section
+        className="panel preparation-guide"
+        aria-label="업로드 전 준비 안내"
+      >
+        <h2>파일을 올리기 전에, 필요한 자료부터 확인하세요.</h2>
+        <p className="muted">
+          기존 파일의 열 이름은 달라도 괜찮아요. 가지고 있는 영역만 만들 수
+          있으며, 다른 인사 시스템에 직접 접속하지 않아요.
+        </p>
+        <div className="preparation-grid">
+          <article>
+            <h3>인원·입퇴사</h3>
+            <p>
+              <strong>필요:</strong> 사번·입사일·퇴사일과 이력이 빠짐없이 있는
+              기간. 부서·고용형태는 선택이에요.
+            </p>
+            <p>
+              <strong>없으면:</strong> 현재 명단과 기준일로 해당 날짜의 인원만
+              계산해요. 과거 인원과 입퇴사는 추정하지 않아요.
+            </p>
+          </article>
+          <article>
+            <h3>근태·휴가</h3>
+            <p>
+              <strong>필요:</strong> 사번·날짜·항목·수치와 시간/일 단위. 기록 ID
+              또는 사번·날짜·항목의 조합으로 중복을 확인해요.
+            </p>
+            <p>
+              <strong>없으면:</strong> 근태·휴가 분석은 자료 없음으로 표시해요.
+              일수를 시간으로 임의 변환하지 않아요.
+            </p>
+          </article>
+          <article>
+            <h3>인건비</h3>
+            <p>
+              <strong>필요:</strong> 사번·지급일/귀속월·지급 항목·금액과 원/천
+              원/만 원 단위. 기록 ID 또는 복합 키가 필요해요.
+            </p>
+            <p>
+              <strong>없으면:</strong> 비용을 추정하지 않아요. 제공한 일부
+              항목을 회사 전체 인건비로 표현하지 않아요.
+            </p>
+          </article>
+        </div>
+        <details>
+          <summary>지원하는 표 구조와 준비 예시</summary>
+          <p>
+            CSV 또는 XLSX · 첫 열 이름 행을 선택할 수 있어요. 기본은 한 행에 한
+            직원의 재직 구간, 또는 한 직원·날짜·항목의 기록이에요.
+          </p>
+          <p>
+            예: 사번 | 기준월 | 항목 | 값 → A001 | 2026-10-01 | 연장근무 | 8
+            (시간)
+          </p>
+          <p>
+            총근무시간·휴가일수처럼 수치가 여러 열에 있으면 ‘열별 수치’ 구조를
+            선택할 수 있어요. 설명 행·중간 소계·병합된 교차표는 먼저 정리해
+            주세요. XLS·XLSM·암호 파일은 지원하지 않아요.
+          </p>
+          <p>
+            여러 파일을 함께 쓰면 같은 사번 기준이어야 해요.
+            이름·연락처·생년월일은 보고용 집계에 필요하지 않아요.
+          </p>
+        </details>
+      </section>
       <div className="input-grid">
         <section className="panel">
           <div className="section-heading">
@@ -265,28 +354,6 @@ export function DataInput({
               다른 샘플 보기
             </Button>
             <small>샘플도 업로드 파일과 같은 집계 과정을 거쳐요.</small>
-          </section>
-          <section className="panel compact">
-            <h3>어떤 자료를 준비하면 되나요?</h3>
-            <dl className="requirements">
-              <dt>인원·입퇴사</dt>
-              <dd>
-                사번, 입사일, 퇴사일
-                <br />
-                선택: 부서, 고용형태
-              </dd>
-              <dt>근태·휴가</dt>
-              <dd>
-                사번, 기준일, 항목, 값<br />
-                기록 ID와 시간·일 단위
-              </dd>
-              <dt>인건비</dt>
-              <dd>
-                사번, 지급일, 지급 항목, 금액
-                <br />
-                기록 ID와 금액 단위
-              </dd>
-            </dl>
           </section>
         </aside>
       </div>

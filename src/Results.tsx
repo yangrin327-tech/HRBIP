@@ -24,12 +24,15 @@ import {
 } from "../shared/analytics";
 import { DataChart } from "./Charts";
 import { Button, Notice, PageTitle, Steps, Modal } from "./ui";
+import { MetricEvidence } from "./MetricEvidence";
+import { ExportPreview } from "./ExportPreview";
 export function Results({
   w,
   r,
   setW,
   onFilters,
   onSave,
+  onRepeat,
   onTemplate,
   onShare,
   onExport,
@@ -42,6 +45,7 @@ export function Results({
   setW: (fn: (v: Workspace) => void) => void;
   onFilters: (f: Filters) => void;
   onSave: () => void;
+  onRepeat: () => void;
   onTemplate: () => void;
   onShare: () => void;
   onExport: (format: string) => Promise<void>;
@@ -50,6 +54,7 @@ export function Results({
   busy?: boolean;
 }) {
   const [baseFilters] = useState(w.filters);
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [tab, setTab] = useState("dashboard"),
     [editing, setEditing] = useState(false),
     [exporting, setExporting] = useState(false),
@@ -85,8 +90,8 @@ export function Results({
   const unavailableTemplate = w.design.cards.filter(
     (c) => !r.charts.some((x) => x.id === c.id),
   );
-  const adaptedCards = w.design.cards.filter(c => {
-    const chart = r.charts.find(x => x.id === c.id);
+  const adaptedCards = w.design.cards.filter((c) => {
+    const chart = r.charts.find((x) => x.id === c.id);
     return chart && !chart.allowed.includes(c.type);
   });
   return (
@@ -195,8 +200,19 @@ export function Results({
           주세요.
         </Notice>
       )}
-      {adaptedCards.length > 0 && <Notice>현재 데이터에는 {adaptedCards.map(c=>c.title).join(", ")}의 저장된 차트 종류가 맞지 않아 추천 차트로 표시해요. 편집 패널에서 사용 가능한 대안을 선택하세요. 지표와 계산값은 유지돼요.</Notice>}
-      {readOnly && !reviewed && <Notice tone="warning">소유자가 최신 보고서를 최종 확인하기 전이에요. 조회는 가능하며, 다운로드는 소유자의 확인 후 사용할 수 있어요.</Notice>}
+      {adaptedCards.length > 0 && (
+        <Notice>
+          현재 데이터에는 {adaptedCards.map((c) => c.title).join(", ")}의 저장된
+          차트 종류가 맞지 않아 추천 차트로 표시해요. 편집 패널에서 사용 가능한
+          대안을 선택하세요. 지표와 계산값은 유지돼요.
+        </Notice>
+      )}
+      {readOnly && !reviewed && (
+        <Notice tone="warning">
+          소유자가 최신 보고서를 최종 확인하기 전이에요. 조회는 가능하며,
+          다운로드는 소유자의 확인 후 사용할 수 있어요.
+        </Notice>
+      )}
       {unavailableTemplate.length > 0 && (
         <Notice>
           템플릿의 {unavailableTemplate.map((c) => c.title).join(", ")} 카드는
@@ -259,6 +275,14 @@ export function Results({
                       <small>{m.value !== null ? m.unit : ""}</small>
                     </strong>
                     <p>{m.value === null ? "자료 없음 / 계산 불가" : m.note}</p>
+                    <Button
+                      variant="ghost"
+                      className="metric-evidence-button"
+                      aria-label={m.label + " (" + m.unit + ") 계산 기준 보기"}
+                      onClick={() => setEvidenceId(m.id)}
+                    >
+                      계산 기준 보기
+                    </Button>
                   </article>
                 ))}
               </div>
@@ -607,12 +631,22 @@ export function Results({
             <ArrowLeft size={17} />
             데이터 확인으로
           </Button>
+          <Button onClick={onRepeat}>새 자료로 반복 보고</Button>
           <span className="muted">
             {reviewed
               ? "최종 확인 완료"
               : "내보내기 전 수치와 문장을 함께 확인해 주세요."}
           </span>
         </div>
+      )}
+      {evidenceId && (
+        <MetricEvidence
+          w={w}
+          r={r}
+          id={evidenceId}
+          readOnly={readOnly}
+          onClose={() => setEvidenceId(null)}
+        />
       )}
       {exporting && (
         <Modal
@@ -632,21 +666,23 @@ export function Results({
               갱신하거나 직접 비교 확인한 뒤 출력하세요.
             </Notice>
           )}
-          <div className="export-review">
-            {r.metrics
-              .filter((m) => m.value !== null)
-              .map((m) => (
-                <div key={m.id}>
-                  <span>{m.label}</span>
-                  <strong>{formatValue(m.value, m.unit)}</strong>
-                </div>
-              ))}
-          </div>
-          <details>
-            <summary>출력할 보고 문장 확인</summary>
-            <pre>{w.report.generated}</pre>
-            <pre>{w.report.notes}</pre>
-          </details>
+          <label>
+            파일 형식
+            <select value={format} onChange={(e) => setFormat(e.target.value)}>
+              <option value="pdf">PDF · 문서와 차트</option>
+              <option value="pptx">
+                PowerPoint · 편집 가능한 텍스트·표·차트
+              </option>
+              <option value="xlsx">Excel · 집계표와 기준</option>
+            </select>
+          </label>
+          <ExportPreview
+            w={w}
+            r={r}
+            format={format}
+            setW={setW}
+            readOnly={readOnly}
+          />
           {!readOnly && (
             <label className="check">
               <input
@@ -662,16 +698,6 @@ export function Results({
               현재 수치·기간·필터와 보고서 문장, 직접 작성한 의견을 확인했어요.
             </label>
           )}
-          <label>
-            파일 형식
-            <select value={format} onChange={(e) => setFormat(e.target.value)}>
-              <option value="pdf">PDF · 문서와 차트</option>
-              <option value="pptx">
-                PowerPoint · 편집 가능한 텍스트·표·차트
-              </option>
-              <option value="xlsx">Excel · 집계표와 기준</option>
-            </select>
-          </label>
           {format === "pptx" && (
             <Notice>
               PPTX에는 네이티브 차트와 데이터가 들어가요. 웹 필터는 포함되지
@@ -695,7 +721,7 @@ export function Results({
             </Button>
             <Button
               busy={exportBusy}
-              disabled={!reviewed}
+              disabled={!reviewed || !w.title.trim()}
               variant="primary"
               onClick={async () => {
                 setExportBusy(true);

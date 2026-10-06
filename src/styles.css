@@ -2200,6 +2200,110 @@ details[open] > summary::before {
   border-radius: 12px;
   line-height: 1.7;
 }
+
+.preparation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 22px 0;
+}
+.preparation-grid article {
+  background: #f5f8ef;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+}
+.preparation-grid p,
+.evidence-source p,
+.output-preview p {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.preparation-guide > h2 {
+  font-size: 22px;
+}
+.metric .metric-evidence-button {
+  margin-top: 12px;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #215c40;
+  border: 1px solid #cbdacb;
+  font-size: 14px;
+}
+.evidence-list dt {
+  font-weight: 700;
+  margin-top: 18px;
+}
+.evidence-list dd {
+  margin: 6px 0 18px;
+  line-height: 1.75;
+}
+.evidence-source {
+  padding: 16px;
+  background: #f5f8ef;
+  border-radius: 12px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.output-preview {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  margin: 20px 0;
+}
+.preview-cover {
+  background: #edf5e6;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.output-preview > h3 {
+  margin: 28px 0 12px;
+}
+.output-preview details {
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+.output-preview summary {
+  min-height: 44px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.output-preview .export-review > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.output-preview .export-review small {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.saved-list article {
+  flex-wrap: wrap;
+}
+.saved-list article > div:not(.actions) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 960px) {
+  .preparation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .output-preview {
+    padding: 12px;
+  }
+  .preview-cover {
+    padding: 14px;
+  }
+  .saved-list .actions {
+    flex-wrap: wrap;
+  }
+}
 .save-state strong {
   font-size: 16px;
   color: #214d35;

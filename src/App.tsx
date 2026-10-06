@@ -39,6 +39,8 @@ import { Button, Notice, Modal, PageTitle } from "./ui";
 import { DataInput } from "./DataInput";
 import { DataReview } from "./DataReview";
 import { Results } from "./Results";
+import { prepareRepeat, type ReusePlan } from "../shared/reuse";
+import { RepeatReview } from "./RepeatReview";
 
 type User = { id: string; username: string };
 type Stored = {
@@ -61,6 +63,7 @@ export default function App() {
     [requestOpen, setRequestOpen] = useState(false);
   const [sampleListOpen, setSampleListOpen] = useState(false);
   const [returnToSaved, setReturnToSaved] = useState(false);
+  const [reusePlan, setReusePlan] = useState<ReusePlan | null>(null);
   const [workId, setWorkId] = useState(""),
     [revision, setRevision] = useState(0),
     [dirty, setDirty] = useState(false),
@@ -140,6 +143,8 @@ export default function App() {
     openWorkspace(next, to, design);
   }
   function openWorkspace(next: Workspace, to: string, design?: Design) {
+    setReusePlan(null);
+    setStatus("");
     if (design) next.design = structuredClone(design);
     if (to === "result") {
       const r = aggregate(next);
@@ -169,6 +174,24 @@ export default function App() {
     try {
       const { largeSampleWorkspace } = await import("../shared/sample-large");
       openWorkspace(largeSampleWorkspace(), "result");
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function repeatWorkspace(source: Workspace) {
+    const { workspace, plan } = prepareRepeat(source);
+    openWorkspace(workspace, "input");
+    setReusePlan(plan);
+  }
+  async function repeatStored(item: Stored) {
+    if (!canReplace()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await api("/works/" + item.id);
+      repeatWorkspace(data.workspace);
     } catch (e) {
       handleError(e);
     } finally {
@@ -239,6 +262,7 @@ export default function App() {
       }
       const data = await api("/works/" + item.id);
       rawSetW(data.workspace);
+      setReusePlan(null);
       setWorkId(data.id);
       setRevision(data.revision);
       setDirty(false);
@@ -431,10 +455,16 @@ export default function App() {
             </button>
             <button
               className={
-                ["input", "verify", "result"].includes(route) ? "selected" : ""
+                ["input", "repeat", "verify", "result"].includes(route)
+                  ? "selected"
+                  : ""
               }
               onClick={() =>
-                w.datasets.length && !shared ? navigate("result") : start()
+                ["input", "repeat", "verify"].includes(route)
+                  ? navigate(route)
+                  : w.datasets.length && !shared
+                    ? navigate("result")
+                    : start()
               }
             >
               <BarChart3 size={19} />
@@ -513,14 +543,15 @@ export default function App() {
                     HR Business Intelligence Partner
                   </div>
                   <h2 className="hero-message">
-                    흩어진 인사 자료를
+                    기존 인사 자료에서,
                     <br />
-                    한눈에 보는 현황으로.
+                    검토 가능한 보고서까지.
                   </h2>
                   <p>
-                    자료 확인부터 대시보드, 보고서까지.
+                    인사 시스템에서 내려받은 파일과 엑셀을 연결하세요.
                     <br />
-                    인사 업무의 다음 단계를 HRBIP와 함께하세요.
+                    숫자의 기준을 확인하고, 차트와 문서를 편집해 보고에
+                    활용하세요.
                   </p>
                   <div className="hero-actions">
                     <Button variant="primary" onClick={() => start()}>
@@ -613,18 +644,18 @@ export default function App() {
                     {[
                       [
                         "01",
-                        "자료를 연결해요",
-                        "기존 CSV·Excel 파일이나 가상 샘플로 시작해요.",
+                        "입력 · 기존 자료를 연결해요",
+                        "필요한 항목과 파일 구조를 먼저 확인하고 CSV·Excel을 가져오세요.",
                       ],
                       [
                         "02",
-                        "숫자의 기준을 확인해요",
-                        "항목·오류·기간을 확인하고 추천 결과를 만들어요.",
+                        "확인 · 숫자의 근거를 검토해요",
+                        "누락·중복·기간과 계산 기준을 확인해요. 없는 자료는 추정하지 않아요.",
                       ],
                       [
                         "03",
-                        "내 업무에 맞게 완성해요",
-                        "편집한 결과를 저장하고 문서로 내보내세요.",
+                        "출력 · 보고할 자료를 완성해요",
+                        "문장과 차트를 미리 보고 PDF·PPT·Excel로 출력하세요. 다음 보고는 저장한 설정으로 시작해요.",
                       ],
                     ].map(([n, t, d]) => (
                       <div className="how-step" key={n}>
@@ -673,9 +704,19 @@ export default function App() {
               setW={setW}
               originals={originals}
               setOriginals={setOriginals}
-              onNext={() => navigate("verify")}
+              repeating={!!reusePlan}
+              onNext={() => navigate(reusePlan ? "repeat" : "verify")}
               onSample={() => start(true, "verify")}
               onSampleList={() => setSampleListOpen(true)}
+            />
+          )}
+          {route === "repeat" && reusePlan && (
+            <RepeatReview
+              w={w}
+              plan={reusePlan}
+              setW={setW}
+              onNext={() => navigate("verify")}
+              onBack={() => navigate("input")}
             />
           )}
           {route === "verify" && (
@@ -718,6 +759,9 @@ export default function App() {
                     });
                 }}
                 onSave={() => save()}
+                onRepeat={() => {
+                  if (canReplace()) repeatWorkspace(w);
+                }}
                 onTemplate={() => {
                   if (!user) {
                     setAuthOpen(true);
@@ -785,6 +829,14 @@ export default function App() {
                           <Button onClick={() => openWork(item)}>
                             열기 <ArrowRight size={15} />
                           </Button>
+                          {!!item.owned && (
+                            <Button
+                              onClick={() => repeatStored(item)}
+                              busy={busy}
+                            >
+                              새 자료로 반복 보고
+                            </Button>
+                          )}
                           {!!item.owned && (
                             <Button
                               variant="ghost"

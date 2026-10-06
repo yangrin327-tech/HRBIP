@@ -156,7 +156,7 @@ test("guest sample, report editing, linked filters, chart editor and PDF downloa
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "흩어진 인사 자료를 한눈에 보는 현황으로.",
+      name: "기존 인사 자료에서, 검토 가능한 보고서까지.",
     }),
   ).toBeVisible();
   await page.screenshot({
