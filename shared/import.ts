@@ -1,4 +1,4 @@
-import { fields, type Dataset, type Field, type Role } from "./model";
+import { fields, type Dataset, type Field, type Role } from "./model.js";
 const aliases: Record<Field, string[]> = {
   employeeId: ["사번", "직원번호", "직원id", "employeeid", "empid", "사원번호"],
   startDate: ["입사일", "입사일자", "hiredate", "startdate"],

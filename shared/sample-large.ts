@@ -5,8 +5,8 @@ import {
   audit,
   type Workspace,
   type Role,
-} from "./model";
-import { recommendMapping } from "./import";
+} from "./model.js";
+import { recommendMapping } from "./import.js";
 
 export function largeSampleWorkspace(): Workspace {
   const w = emptyWorkspace();

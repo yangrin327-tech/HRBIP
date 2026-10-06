@@ -15,7 +15,7 @@ import {
   targetPath,
   esc,
   prunePackage,
-} from "./office-xml";
+} from "./office-xml.js";
 import {
   suggestField,
   fieldValue,
@@ -23,8 +23,8 @@ import {
   type Binding,
   type FormatInspection,
   type FormatSlot,
-} from "../shared/company-format";
-import type { Workspace, Result, Chart } from "../shared/model";
+} from "../shared/company-format.js";
+import type { Workspace, Result, Chart } from "../shared/model.js";
 
 const P = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const A = "http://schemas.openxmlformats.org/drawingml/2006/main";

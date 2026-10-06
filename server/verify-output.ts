@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import ExcelJS from "exceljs";
-import { readXml, local, FormatError } from "./office-xml";
-import { fieldValue, type CompanyFormat } from "../shared/company-format";
-import { effectiveCards, formatValue } from "../shared/analytics";
-import type { Workspace, Result } from "../shared/model";
+import { readXml, local, FormatError } from "./office-xml.js";
+import { fieldValue, type CompanyFormat } from "../shared/company-format.js";
+import { effectiveCards, formatValue } from "../shared/analytics.js";
+import type { Workspace, Result } from "../shared/model.js";
 const text = (n: any) =>
   local(n, "t")
     .map((x) => x.textContent)

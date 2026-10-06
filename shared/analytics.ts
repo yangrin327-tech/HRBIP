@@ -9,7 +9,7 @@ import {
   type Point,
   digest,
   roleNames,
-} from "./model";
+} from "./model.js";
 import {
   read,
   requiredFields,
@@ -18,7 +18,7 @@ import {
   monthEnd,
   priorMonth,
   months,
-} from "./import";
+} from "./import.js";
 
 type Person = {
   id: string;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Result, Workspace } from "./model";
+import type { Result, Workspace } from "./model.js";
 export const bindingSchema = z.object({
   slot: z.string().max(200),
   field: z.string().max(100),

@@ -1,6 +1,6 @@
-import { createApp } from "../server/app";
-import { serverConfig } from "../server/config";
-import { postgresStore } from "../server/database";
+import { createApp } from "../server/app.js";
+import { serverConfig } from "../server/config.js";
+import { postgresStore } from "../server/database.js";
 
 const config = serverConfig();
 if (!process.env.DATABASE_URL)

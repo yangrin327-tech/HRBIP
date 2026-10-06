@@ -1,5 +1,5 @@
-import { draft } from "./analytics";
-import type { Result } from "./model";
+import { draft } from "./analytics.js";
+import type { Result } from "./model.js";
 export interface ReportProvider {
   readonly kind: "rules" | "external";
   generate(verified: Result): Promise<string>;

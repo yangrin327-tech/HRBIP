@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
-import { openStore } from "./store";
-import { createApp } from "./app";
+import { openStore } from "./store.js";
+import { createApp } from "./app.js";
 import express from "express";
-import { serverConfig } from "./config";
-import { postgresStore, sqliteStore } from "./database";
+import { serverConfig } from "./config.js";
+import { postgresStore, sqliteStore } from "./database.js";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 else if (existsSync(".env")) process.loadEnvFile(".env");
 const { port, host, origin, publicDemo, trustProxyHops } = serverConfig();

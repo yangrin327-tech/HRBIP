@@ -3,8 +3,8 @@ import {
   verifyCalculations,
   statusNames,
   type Verification,
-} from "../shared/verification";
-import type { Workspace, Result } from "../shared/model";
+} from "../shared/verification.js";
+import type { Workspace, Result } from "../shared/model.js";
 export function addVerificationSheets(wb: ExcelJS.Workbook, v: Verification) {
   const unique = (name: string) => {
     let n = name,

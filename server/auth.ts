@@ -5,7 +5,7 @@ import {
   createHash,
 } from "node:crypto";
 import { promisify } from "node:util";
-import type { Store } from "./database";
+import type { Store } from "./database.js";
 import type { Request, Response } from "express";
 const scrypt = promisify(scryptCallback);
 export async function hashPassword(password: string) {

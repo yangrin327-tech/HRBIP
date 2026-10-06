@@ -2,7 +2,7 @@ import type { Express, Request } from "express";
 import { createHash, randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 import { z } from "zod";
-import type { Store } from "./database";
+import type { Store } from "./database.js";
 
 const CHUNK = 1024 * 1024;
 const MAX_BODY = 40 * CHUNK;

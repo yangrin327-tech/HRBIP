@@ -4,38 +4,38 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { sqliteStore, type Store } from "./database";
+import { sqliteStore, type Store } from "./database.js";
 import { z } from "zod";
 import {
   workspaceSchema,
   filtersSchema,
   designSchema,
   type Workspace,
-} from "../shared/model";
-import { aggregate, draft, effectiveCards } from "../shared/analytics";
+} from "../shared/model.js";
+import { aggregate, draft, effectiveCards } from "../shared/analytics.js";
 import {
   currentUser,
   hashPassword,
   verifyPassword,
   startSession,
   endSession,
-} from "./auth";
-import { exportFile } from "./export";
-import { bindingSchema, type CompanyFormat } from "../shared/company-format";
+} from "./auth.js";
+import { exportFile } from "./export.js";
+import { bindingSchema, type CompanyFormat } from "../shared/company-format.js";
 import {
   inspectCompanyFormat,
   sanitizeCompanyFormat,
   applyCompanyFormat,
-} from "./company-format";
-import { verifyCalculations } from "../shared/verification";
-import { exportVerification } from "./verification-export";
-import { FormatError } from "./office-xml";
-import { verifyOfficeOutput } from "./verify-output";
+} from "./company-format.js";
+import { verifyCalculations } from "../shared/verification.js";
+import { exportVerification } from "./verification-export.js";
+import { FormatError } from "./office-xml.js";
+import { verifyOfficeOutput } from "./verify-output.js";
 import {
   installTransfers,
   streamLargeResponses,
   TransferError,
-} from "./transfers";
+} from "./transfers.js";
 class HttpError extends Error {
   constructor(
     public status: number,

@@ -1,5 +1,5 @@
-import { emptyWorkspace, newDataset, type Workspace } from "./model";
-import { recommendMapping } from "./import";
+import { emptyWorkspace, newDataset, type Workspace } from "./model.js";
+import { recommendMapping } from "./import.js";
 export function sampleWorkspace(): Workspace {
   const w = emptyWorkspace();
   w.title = "2026년 3분기 인사현황";

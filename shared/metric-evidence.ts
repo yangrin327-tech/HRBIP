@@ -5,8 +5,8 @@ import {
   type Field,
   type Role,
   type Dataset,
-} from "./model";
-import { monthEnd, priorMonth, parseDate } from "./import";
+} from "./model.js";
+import { monthEnd, priorMonth, parseDate } from "./import.js";
 
 export function datasetRange(d: Dataset): string {
   if (d.role === "people")

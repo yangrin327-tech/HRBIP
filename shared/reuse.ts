@@ -1,4 +1,4 @@
-import { audit, emptyWorkspace, type Dataset, type Workspace } from "./model";
+import { audit, emptyWorkspace, type Dataset, type Workspace } from "./model.js";
 
 // A reuse plan contains definitions only. No rows, people, report text or old periods.
 export type ReuseRule = Pick<

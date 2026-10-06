@@ -1,6 +1,6 @@
-import type { Workspace, Result, Dataset, Role } from "./model";
-import { digest, roleNames } from "./model";
-import { parseDate, months, monthEnd, priorMonth } from "./import";
+import type { Workspace, Result, Dataset, Role } from "./model.js";
+import { digest, roleNames } from "./model.js";
+import { parseDate, months, monthEnd, priorMonth } from "./import.js";
 
 export type CheckStatus = "pass" | "attention" | "fail" | "unavailable";
 export type CalculationCheck = {

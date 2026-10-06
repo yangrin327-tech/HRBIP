@@ -1,16 +1,16 @@
 import ExcelJS from "exceljs";
 import pptxgen from "pptxgenjs";
-import { launchPdfBrowser, pdfFontCss } from "./pdf-runtime";
-import { aggregate, effectiveCards, formatValue } from "../shared/analytics";
-import { parseDate } from "../shared/import";
-import { verifyCalculations, sharedVerification } from "../shared/verification";
-import { addVerificationSheets } from "./verification-export";
+import { launchPdfBrowser, pdfFontCss } from "./pdf-runtime.js";
+import { aggregate, effectiveCards, formatValue } from "../shared/analytics.js";
+import { parseDate } from "../shared/import.js";
+import { verifyCalculations, sharedVerification } from "../shared/verification.js";
+import { addVerificationSheets } from "./verification-export.js";
 import {
   type Workspace,
   type Result,
   type Chart,
   type Card,
-} from "../shared/model";
+} from "../shared/model.js";
 const esc = (s: unknown) =>
   String(s ?? "").replace(
     /[&<>"']/g,
