@@ -7,7 +7,7 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 120,
-      "includeFiles": "{server/certs/*.crt,node_modules/@sparticuz/chromium/bin/**,node_modules/@fontsource/noto-sans-kr/400.css,node_modules/@fontsource/noto-sans-kr/files/*-400-normal.woff2}",
+      "includeFiles": "{server/certs/*.crt,node_modules/pptxgenjs/package.json,node_modules/pptxgenjs/dist/pptxgen.cjs.js,node_modules/@sparticuz/chromium/bin/**,node_modules/@fontsource/noto-sans-kr/400.css,node_modules/@fontsource/noto-sans-kr/files/*-400-normal.woff2}",
       "excludeFiles": "{.data/**,artifacts/**,outputs/**,output/**,tests/**,docs/**,scripts/**,node_modules/playwright-core/.local-browsers/**}"
     }
   },
