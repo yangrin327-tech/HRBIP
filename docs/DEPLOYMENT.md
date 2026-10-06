@@ -6,7 +6,7 @@
 
 사용자가 이전 실습과 같은 배포 서비스를 요청했다. `day09` 실습 기록과 기존 계정의 `day09-saju` 프로젝트에서 **Vercel + Supabase**를 확인했다. Vercel Hobby 계정은 로그인되어 있고 HRBIP GitHub 저장소를 가져오는 화면까지 확인했다. Railway는 사용하지 않는다.
 
-Supabase 기존 로그인 연결이 인증 오류로 실패했다. 사용자에게 직접 로그인하도록 요청한 상태다. HRBIP 전용 Supabase 프로젝트 생성, 서버 연결 정보 설정, 실제 배포와 URL 검증이 남았다. 기존 사주 프로젝트나 DB는 수정하지 않는다. 유료 플랜·결제는 승인받지 않았다.
+Supabase 로그인은 사용자가 완료했고 서울 지역에 무료 HRBIP 전용 프로젝트를 생성했다. 전용 테이블 10개와 RLS를 SQL Editor에서 적용한 결과를 확인했다. Vercel 비밀값 연결, 실제 배포와 URL 검증이 남았다. 기존 사주 프로젝트나 DB는 수정하지 않는다. 유료 플랜·결제는 승인받지 않았다.
 
 ## 구성
 
@@ -28,12 +28,13 @@ node scripts/migrate-postgres.mjs
 ```
 
 4. Vercel에서 `yangrin327-tech/HRBIP`, 기본 브랜치 `main`, Vite, Node 24, 프로젝트 루트 `./`를 선택한다. `vercel.json`의 빌드/함수/경로 설정을 사용한다.
-5. 아래 환경변수를 서버 환경에 설정한다. 공개 배포 URL이 확정되면 `APP_ORIGIN`을 실제 주소와 일치시킨다. 미리보기 배포도 별도 origin/설정이 필요하다. 임의 Host 헤더를 신뢰해 origin을 자동 허용하지 않는다.
+5. 아래 환경변수를 서버 환경에 설정한다. `APP_ORIGIN`이 없으면 Vercel 운영 환경의 `VERCEL_PROJECT_PRODUCTION_URL`을 사용하며, 미리보기 환경은 해당 배포의 `VERCEL_URL`을 사용한다. 임의 요청의 Host 헤더는 사용하지 않는다. DB 비밀번호는 URL에 넣는 대신 별도 `PGPASSWORD`로 입력할 수 있다. 운영 DB 비밀값을 Preview에 자동 복사하지 않는다.
 
 | 이름 | 값 또는 의미 |
 |---|---|
 | `DATABASE_URL` | HRBIP 전용 PostgreSQL 연결 비밀값, TLS 사용 |
-| `APP_ORIGIN` | 실제 `https://…vercel.app` 주소, 마지막 `/` 없음 |
+| `PGPASSWORD` | URL에 비밀번호를 넣지 않은 경우 사용하는 DB 비밀번호. 서버 전용 비밀값 |
+| `APP_ORIGIN` | 선택: 실제 HTTPS 주소. 미지정 시 위 Vercel 시스템 환경변수 사용 |
 | `COOKIE_SECURE` | `true` |
 | `PUBLIC_DEMO` | `true` |
 | `TRUST_PROXY_HOPS` | Vercel 프록시 경로 확인 후 `1` |
@@ -63,7 +64,7 @@ Vercel에 `DATA_DIR`를 지정해 임시 디스크를 영구 저장소처럼 사
 | 5MiB 원본 전송/다운로드 | 분할 전송·세션/경로 차단·크기 검증·재사용/만료 차단·스트리밍 후 SHA-256 일치 PASS |
 | PDF 한글 | 10페이지 텍스트에서 한글 1,033자 추출. 표지 PNG 렌더링에서 한글·표·여백 확인. 이번 검사에서 모든 페이지 시각 전수 검사는 하지 않음 |
 | 기존 로컬 저장 작업 | 4개 payload 해시 불변, SQLite quick_check=ok |
-| Supabase 실제 연결·풀러·TLS | NOT TESTED — 사용자 로그인과 전용 DB 준비 필요 |
+| Supabase 스키마·TLS | 전용 테이블 10개/RLS 확인. 공식 CA를 적용한 풀러 TLS 1.3 인증서·호스트 검증 PASS, 비밀번호는 전송하지 않음. 서버 계정 인증 연결은 아직 NOT TESTED |
 | Vercel 빌드·배포·공개 URL | NOT TESTED |
 | Vercel Linux Chromium/PDF·큰 본문·공유 | NOT TESTED |
 

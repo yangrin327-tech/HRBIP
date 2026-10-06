@@ -2,7 +2,16 @@ export function serverConfig(env: NodeJS.ProcessEnv = process.env) {
   const port = Number(env.PORT || 4173);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("PORT must be an integer from 1 to 65535.");
-  const origin = env.APP_ORIGIN || "http://127.0.0.1:4173";
+  // Only deployment-owned environment metadata may supply the public origin; never request Host headers.
+  const deploymentHost =
+    env.VERCEL_ENV === "production"
+      ? env.VERCEL_PROJECT_PRODUCTION_URL
+      : env.VERCEL_URL;
+  const origin =
+    env.APP_ORIGIN ||
+    (env.VERCEL && deploymentHost
+      ? `https://${deploymentHost}`
+      : "http://127.0.0.1:4173");
   const parsed = new URL(origin);
   if (
     parsed.origin !== origin ||

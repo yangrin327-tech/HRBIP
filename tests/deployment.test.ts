@@ -32,6 +32,24 @@ test("public hosting fails closed for missing HTTPS, secure cookies or data loca
     /TRUST_PROXY/,
   );
   assert.throws(() => serverConfig({ ...env, PORT: "0" }), /PORT/);
+  const vercel = {
+    VERCEL: "1",
+    VERCEL_ENV: "production",
+    VERCEL_PROJECT_PRODUCTION_URL: "hrbip-example.vercel.app",
+    DATABASE_URL: "postgres://host/postgres",
+    PUBLIC_DEMO: "true",
+    COOKIE_SECURE: "true",
+  };
+  assert.equal(serverConfig(vercel).origin, "https://hrbip-example.vercel.app");
+  assert.equal(
+    serverConfig({ ...vercel, APP_ORIGIN: "https://custom.example" }).origin,
+    "https://custom.example",
+  );
+  assert.throws(
+    () =>
+      serverConfig({ ...vercel, VERCEL_PROJECT_PRODUCTION_URL: "host/path" }),
+    /origin/,
+  );
 });
 
 test("public origin is enforced and demo metadata is available without authentication", async () => {
