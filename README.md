@@ -15,6 +15,21 @@ npm start
 
 [HRBIP 열기](http://127.0.0.1:4173). 개발 모드: `npm run dev`. 별도 API 키·유료 서비스가 필요하지 않다.
 
+Windows 로그인 때 서버를 자동으로 실행하려면 첫 빌드 후 아래 명령을 한 번 실행한다. 직접 실행한 `npm start`는 먼저 종료한다. 중지·재시작·등록 해제 방법은 [실행 안내](docs/OPERATIONS.md#windows에서-자동-실행)에 있다.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Install
+```
+
+## 제출·공개 범위
+
+이 저장소는 **프로젝트 코드와 문서**를 제공한다. 위 `127.0.0.1` 주소는 실행한 컴퓨터에서만 열리며 공개 웹사이트 주소가 아니다. 로그인·저장·내보내기에는 Node.js 서버가 필요하므로 GitHub Pages에 정적 파일만 올리는 것으로 전체 서비스가 실행되지는 않는다.
+
+- 실제 사용자 계정, 비밀번호, 저장 보고서, 업로드 원본, 로컬 DB, 환경설정 비밀값은 저장소에 포함하지 않는다.
+- 내장 샘플은 가상 인사 자료다. 기본 샘플과 150명·24개월 샘플을 비로그인으로 체험할 수 있다.
+- 초기 기획 문서는 당시 결정의 기록이다. 현재 기능은 아래 상태와 `docs/IMPLEMENTATION.md`를 기준으로 확인한다.
+- 공개 후에도 코드를 수정하고 새 커밋을 올릴 수 있다. 코드 업로드와 별도 서버의 웹 배포는 각각 진행한다.
+
 ## 현재 상태
 
 - 기준일: 2026-10-06. **로컬 v0.1.4. 회사 PPTX·Excel 양식 등록/연결/재사용, 독립 계산 대조와 검증표.**
@@ -45,7 +60,6 @@ npm start
 | [BUILD_PLAN.md](BUILD_PLAN.md) | 구현 요청 후 진행할 화면 흐름과 제작 순서 |
 | [PROJECT_LOG.md](PROJECT_LOG.md) | 선택 이유와 변경 과정 |
 | [WORKLOG.md](WORKLOG.md) | 날짜별 실제 수행 내역 |
-| [가상 인사 데이터](docs/SYNTHETIC_DATA.md) | 180명·24개월의 Excel·CSV, 항목 정의, 집계 기준과 테스트 예시 |
 | [초기 PRD 이미지](docs/images/HRBIP_PRD_overview_v0.1.png) | v0.1 당시 요약. 현재 요구사항과 일부 다름 |
 | [이미지 제작 기록](docs/HRBIP_PRD_overview_prompt.md) | 초기 이미지의 생성·수정 프롬프트 |
 

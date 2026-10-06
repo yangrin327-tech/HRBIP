@@ -13,6 +13,35 @@ npm start
 브라우저에서 http://127.0.0.1:4173 을 연다. 개발은 `npm run dev`. 서버를 종료하면 새 요청·로그인·저장·출력은 멈추지만 이미 저장한 DB는 유지된다.
 포트 4173 사용 중이면 기존 HRBIP 프로세스를 종료하거나 .env.local의 PORT와 APP_ORIGIN을 함께 변경한다. 예시는 .env.example에 있다.
 
+### Windows에서 자동 실행
+
+PC 재시작은 실행 중인 로컬 서버도 종료한다. `npm start`만 실행했다면 다음 로그인 때 직접 다시 시작해야 한다. 아래 명령은 **현재 Windows 사용자로 로그인할 때** HRBIP를 숨김 실행하도록 작업 스케줄러에 등록하고 바로 시작한다. 관리자 권한으로 실행하거나 비밀번호를 저장하지 않는다.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Install
+```
+
+- 프로젝트 경로별로 작업을 하나만 등록한다. Codex 터미널이 끝나도 서버는 별도로 실행된다.
+- 서버 프로세스가 끝나면 5초 뒤 재실행한다. 짧은 간격으로 계속 실패하면 재시도 간격을 최대 60초까지 늘린다. 실행 제한 시간 및 배터리 전환 시 강제 종료를 해제한다.
+- 실행 위치를 프로젝트 폴더로 고정해 기존 `.data/hrbip.sqlite`를 사용한다. 계정과 저장 작업을 새로 만들지 않는다.
+- 시작·종료 시각과 종료 코드는 `.data/local-server-lifecycle.log`, 개별 실행 로그는 `.data/local-server-*.log`, 마지막 프로세스 정보는 `.data/local-server.json`에 남는다. 로그는 Git 제외 대상이다.
+- PC 종료·절전·로그아웃 중에는 접속할 수 없다. 무중단 인터넷 호스팅이나 응답이 멈춘 프로세스의 감시 기능은 아니다.
+- Node 설치 경로나 프로젝트 위치가 달라지면 이전 위치에서 `Remove` 후 새 위치에서 `Install`한다. 코드를 수정했으면 빌드 후 `Restart`한다.
+
+```powershell
+# 상태 확인 / 중지 / 다시 시작 / 자동 실행 제거
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Status
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Stop
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Start
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Remove
+
+# 변경 반영
+npm run build
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1 -Action Restart
+```
+
+`Stop`은 자동 복구와 다음 로그인 실행도 일시 중지한다. `Start`로 다시 활성화한다. `Remove`는 자동 실행 등록만 지우고 저장 데이터는 보존한다. 자동 실행과 `npm start`/`npm run dev`를 같은 포트로 동시에 실행하지 않는다. 이 스크립트의 접속 안내는 기본 포트 4173 기준이다.
+
 ## 권장 확인 흐름
 1. 홈 → 샘플로 체험하기. 로그인 없이 결과·편집·출력 체험.
    홈의 **샘플 목록**에서는 사용자 제공 **150명·24개월 샘플**도 선택할 수 있다. 상세 기준은 SAMPLES.md 참고.

@@ -13,3 +13,8 @@ tmp/
 *.db-wal
 *.db-shm
 
+# Local consultation notes and separately generated deliverables are not app source.
+docs/meeting-*/
+output/
+outputs/
+
