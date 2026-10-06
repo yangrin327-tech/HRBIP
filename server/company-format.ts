@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import pptxgen from "pptxgenjs";
+import pptxgen from "./pptx-runtime.js";
 import ExcelJS from "exceljs";
 import { posix } from "node:path";
 import {

@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import pptxgen from "pptxgenjs";
+import pptxgen from "./pptx-runtime.js";
 import { launchPdfBrowser, pdfFontCss } from "./pdf-runtime.js";
 import { aggregate, effectiveCards, formatValue } from "../shared/analytics.js";
 import { parseDate } from "../shared/import.js";
