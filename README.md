@@ -4,6 +4,8 @@
 
 기존 인사 자료를 확인·집계해 종합 인사 보고서와 추천 인터랙티브 대시보드를 만드는 HR 업무 지원 웹이다.
 
+**[공개 웹사이트에서 체험하기](https://hrbip.vercel.app)** · 가상 자료용 포트폴리오 배포. 샘플은 로그인 없이 사용할 수 있다. 온라인 계정과 저장 작업은 로컬 버전과 별개다.
+
 ## 실행
 
 ```powershell
@@ -25,14 +27,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1
 
 이 저장소는 **프로젝트 코드와 문서**를 제공한다. 위 `127.0.0.1` 주소는 실행한 컴퓨터에서만 열리며 공개 웹사이트 주소가 아니다. 로그인·저장·내보내기에는 Node.js 서버가 필요하므로 GitHub Pages에 정적 파일만 올리는 것으로 전체 서비스가 실행되지는 않는다.
 
-제출용 공개 저장소: [yangrin327-tech/HRBIP](https://github.com/yangrin327-tech/HRBIP). 기본 브랜치는 `main`이다. 외부 웹 배포는 아직 하지 않았다.
+제출용 공개 저장소: [yangrin327-tech/HRBIP](https://github.com/yangrin327-tech/HRBIP). 기본 브랜치는 `main`이다. 공개 웹 주소는 **https://hrbip.vercel.app**이다.
 
-사용자의 이전 실습과 같은 **Vercel + Supabase 배포를 준비 중**이다. 로컬 저장을 유지하면서 PostgreSQL, 큰 파일 전송, 서버 PDF 출력을 추가했다. 외부 계정 연결과 실제 공개 URL 검증은 남아 있다. 설정과 현재 상태는 [배포 안내](docs/DEPLOYMENT.md)에 기록한다.
+사용자의 이전 실습과 같은 **Vercel + Supabase로 배포했다**. 공개 URL에서 인증·저장·공유 권한·큰 파일 전송·PDF/PPTX/Excel·회사 양식 적용을 검증했다. 로컬 SQLite는 유지하며 기존 계정·작업을 온라인으로 이전하지 않았다. 설정과 검증 범위는 [배포 안내](docs/DEPLOYMENT.md)에 기록한다.
 
 - 실제 사용자 계정, 비밀번호, 저장 보고서, 업로드 원본, 로컬 DB, 환경설정 비밀값은 저장소에 포함하지 않는다.
 - 내장 샘플은 가상 인사 자료다. 기본 샘플과 150명·24개월 샘플을 비로그인으로 체험할 수 있다.
 - 초기 기획 문서는 당시 결정의 기록이다. 현재 기능은 아래 상태와 `docs/IMPLEMENTATION.md`를 기준으로 확인한다.
-- 공개 후에도 코드를 수정하고 새 커밋을 올릴 수 있다. 코드 업로드와 별도 서버의 웹 배포는 각각 진행한다.
+- 공개 후에도 코드를 수정하고 새 커밋을 올릴 수 있다. `main`에 push하면 Vercel이 자동으로 재배포하며, 빌드와 실제 URL의 상태를 확인한다. DB 스키마 변경은 별도 마이그레이션이 필요하다.
 
 현재 작업 브랜치에서 변경을 커밋한 뒤 `git push origin HEAD:main`으로 제출 저장소를 갱신한다. 업로드 전에 `git diff --cached`로 포함 파일을 확인하고, 개인 자료를 담을 수 있는 모든 브랜치/태그의 일괄 업로드는 하지 않는다.
 
@@ -41,7 +43,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-server.ps1
 - 기준일: 2026-10-06. **로컬 v0.1.4. 회사 PPTX·Excel 양식 등록/연결/재사용, 독립 계산 대조와 검증표.**
 - 사용자 확인: 내 컴퓨터에서 먼저 실행. 2026-10-06 GitHub Public 제출과 외부 웹 배포를 요청했으며 이전 실습의 Vercel 방식을 선택했다.
 - 파일 입력→검증→집계→대시보드/보고서→편집→저장/템플릿/출력/지정 계정 공유 연결.
-- 실제 계정 인증·로컬 SQLite 저장, 외부 PostgreSQL 어댑터 준비. 공유는 같은 서버의 지정 계정만 접근. 외부 배포 실행 결과는 배포 안내 참고.
+- 실제 계정 인증·로컬 SQLite 저장, 외부 Supabase PostgreSQL 저장. 공유는 같은 서버의 지정 계정만 접근. 외부 배포 실행 결과는 배포 안내 참고.
 - 초안은 규칙 기반. 외부 AI가 생성했다고 표시하지 않는다.
 - React·TypeScript·Express·Node 24. 흰색·초록·연두, 추천 틀 편집.
 - 지원 파일과 입력 계약에는 범위가 있다. 실제 회사 자료·운영 보안 검토는 별도.
