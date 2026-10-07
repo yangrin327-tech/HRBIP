@@ -219,7 +219,7 @@ test("contract text preserves original blank line positions and never certifies 
     "임금: 월 300만원, 수당을 포함한다.\n\n근무시간: 09:00~18:00\n연차·휴일은 회사 규정에 따른다.",
   );
   assert.match(row(r, "소정근로시간")![2], /3줄/);
-  assert.match(row(r, "연차")![1], /내용 확인 필요/);
+  assert.match(row(r, "연차")![3], /보완 필요/);
   assert.ok(r.findings.some((x) => x.title === "수당 포함 조건"));
   assert.ok(r.findings.some((x) => x.title === "참조 규정 확인"));
   assert.ok(r.findings.some((x) => x.title === "지급방법 확인"));

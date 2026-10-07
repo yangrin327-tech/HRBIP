@@ -1,4 +1,6 @@
 /** Deterministic checks. No generated legal conclusions or external AI calls. */
+import { reviewContract, reviewRecruitment } from "./document-review.js";
+import { reviewLaw } from "./law-review.js";
 export const SOURCE_CHECKED = "2026-10-07";
 export const sources = {
   payment: {
@@ -16,6 +18,26 @@ export const sources = {
     url: "https://1350.moel.go.kr/rtmview.do?id=1000012468",
     law: "근로기준법 제60조·관련 행정해석",
   },
+  paymentArticle: {
+    name: "금품 청산 · 국가법령정보센터",
+    url: "https://law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029728519",
+    law: "근로기준법 제36조",
+  },
+  contractArticle: {
+    name: "근로조건의 명시 · 국가법령정보센터",
+    url: "https://law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029728107",
+    law: "근로기준법 제17조",
+  },
+  breaks: {
+    name: "휴게시간과 시행일 · 고용노동부",
+    url: "https://1350.moel.go.kr/rtmview.do?id=1000323934",
+    law: "근로기준법 제54조",
+  },
+  penalties: {
+    name: "위약 예정의 금지 · 국가법령정보센터",
+    url: "https://law.go.kr/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=1000113024",
+    law: "근로기준법 제20조",
+  },
 } as const;
 export type SourceId = keyof typeof sources;
 export type Finding = {
@@ -24,6 +46,8 @@ export type Finding = {
   evidence: string;
   action: string;
   source?: SourceId;
+  reason?: string;
+  suggestion?: string;
 };
 export type SupportResult = {
   title: string;
@@ -35,6 +59,8 @@ export type SupportResult = {
   checklist: string[];
   context: string[];
   sourceIds: SourceId[];
+  presentation?: "review" | "guide";
+  steps?: string[];
 };
 export function dateValue(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
@@ -69,21 +95,6 @@ export function amount(value: string, label: string, decimals = false) {
 }
 const fmt = (n: number) =>
   n.toLocaleString("ko-KR", { maximumFractionDigits: 4 });
-function textInput(text: string) {
-  if (text.trim().length < 10)
-    throw new Error("점검할 내용을 10자 이상 입력해 주세요.");
-  if (text.length > 200000)
-    throw new Error("한 번에 20만 글자까지 점검할 수 있어요.");
-  return text
-    .split(/\r\n|\r|\n/)
-    .map((text, i) => ({ text: text.trim(), line: i + 1 }))
-    .filter((x) => x.text);
-}
-const cite = (lines: { text: string; line: number }[]) =>
-  lines
-    .slice(0, 6)
-    .map((x) => x.line + "줄: " + x.text.slice(0, 400))
-    .join("\n");
 const base = (title: string, scope: string): SupportResult => ({
   title,
   scope,
@@ -102,154 +113,27 @@ export type LawInput = {
   eventDate: string;
   agreement: "unknown" | "yes" | "no";
   endMeaning: "unknown" | "last" | "ended";
+  plannedDate?: string;
+  workers?: "unknown" | "under5" | "fivePlus";
+  weeklyHours?: string;
+  tenure?: "unknown" | "underYear" | "yearPlus";
+  attendance?: "unknown" | "under80" | "atLeast80";
+  contractIssue?: "auto" | "written" | "includedPay" | "rest" | "penalty";
 };
 export function recommendTopics(question: string): SourceId[] {
   const found: SourceId[] = [];
-  if (/퇴사|퇴직|정산|체불|지급|급여|임금/.test(question))
-    found.push("payment");
+  if (/퇴사|퇴직|근로관계\s*종료/.test(question)) found.push("payment");
   if (/연차|휴가|개근|출근율/.test(question)) found.push("leave");
-  if (/계약|근로조건|휴게|근무시간|수당포함|포괄/.test(question))
+  if (
+    /계약|근로조건|휴게|근무시간|수당\s*포함|포괄|위약금|손해배상/.test(
+      question,
+    )
+  )
     found.push("contract");
   return found;
 }
 export function lawGuide(input: LawInput): SupportResult {
-  if (!["payment", "leave", "contract"].includes(input.topic))
-    throw new Error("확인할 쟁점을 다시 선택해 주세요.");
-  if (
-    !["unknown", "yes", "no"].includes(input.agreement) ||
-    !["unknown", "last", "ended"].includes(input.endMeaning)
-  )
-    throw new Error("입력 조건을 다시 확인해 주세요.");
-  textInput(input.question);
-  if (input.eventDate) dateValue(input.eventDate);
-  const r = base(
-    "상황 기반 법령·대응 가이드",
-    "지급기한·연차·근로조건 명시의 조건 기반 안내. 실시간 검색이나 개별 사건의 법적 판정은 하지 않음.",
-  );
-  r.context = [
-    "입력 상황: " + input.question,
-    "사건 기준일: " + (input.eventDate || "미확인"),
-    "선택한 쟁점: " + sources[input.topic].law,
-  ];
-  r.sourceIds = [input.topic];
-  r.columns = ["항목", "내용"];
-  r.rows = [
-    ["입력한 상황", input.question],
-    ["선택한 근거", sources[input.topic].law],
-    ["자료 확인일", SOURCE_CHECKED],
-  ];
-  if (!input.eventDate || input.eventDate !== SOURCE_CHECKED)
-    r.findings.push({
-      title: "사건 시점의 법령 확인",
-      level: "unverified",
-      evidence:
-        "자료 확인일은 " +
-        SOURCE_CHECKED +
-        ". 입력한 사건 시점의 법령 연혁은 별도로 검증하지 않았어요.",
-      action: "공식 원문에서 시행일·연혁·부칙을 확인해 주세요.",
-      source: input.topic,
-    });
-  const recommended = recommendTopics(input.question);
-  if (!recommended.includes(input.topic))
-    r.findings.push({
-      title: "질문과 지원 쟁점 확인",
-      level: "check",
-      evidence:
-        "키워드로 선택한 쟁점을 확인하지 못했어요. 입력 문장을 해석해 사실을 추정하지 않아요.",
-      action:
-        "이 질문이 지급기한·연차·근로조건 명시에 해당하는지 먼저 확인하고, 다른 분야는 공식 상담을 이용해 주세요.",
-    });
-  if (input.topic === "payment") {
-    r.summary =
-      "정기 급여일만으로 퇴직 정산일을 확정할 수 없어요. 지급사유 발생일과 기일 연장 합의를 확인하세요.";
-    r.findings.push({
-      title: "퇴직 시 지급기한의 일반 원칙",
-      level: "info",
-      evidence:
-        "근로기준법 제36조는 지급사유 발생 후 14일 이내 청산을 정하고, 특별한 사정이 있으면 당사자 합의로 기일 연장이 가능해요. 퇴직급여는 별도 제도·근거 확인이 필요해요.",
-      action: "정기 급여일과 퇴직 시 지급기한을 구분해 검토하세요.",
-      source: "payment",
-    });
-    if (input.endMeaning !== "ended")
-      r.findings.push({
-        title: "종료일 의미 확인",
-        level: "check",
-        evidence:
-          input.endMeaning === "last"
-            ? "입력 날짜는 마지막 재직일이에요. 지급사유 발생일로 자동 변환하지 않았어요."
-            : "입력 날짜의 의미가 확인되지 않았어요.",
-        action:
-          "마지막 근무일·마지막 재직일·근로관계 종료 시점을 확인해 주세요.",
-      });
-    r.findings.push({
-      title: "지급기일 연장 합의",
-      level: input.agreement === "unknown" ? "check" : "info",
-      evidence:
-        input.agreement === "yes"
-          ? "합의가 있다고 입력했지만 내용과 효력은 검증하지 않았어요."
-          : input.agreement === "no"
-            ? "연장 합의가 없다고 입력했어요."
-            : "합의 여부가 아직 확인되지 않았어요.",
-      action:
-        "특별한 사정, 합의 내용·시점·증빙을 확인하고 효력이 쟁점이면 상담을 준비하세요.",
-      source: "payment",
-    });
-    r.checklist = [
-      "퇴사 의사와 근로관계 종료일 확인 기록",
-      "미지급 급여·수당과 정산 범위",
-      "퇴직급여 제도 및 담당자의 처리 현황",
-      "지급기일 연장 관련 합의 자료",
-      "상담 질문: 이 사안의 지급사유 발생일과 합의의 효력은 무엇인가?",
-    ];
-  } else if (input.topic === "leave") {
-    r.summary =
-      "연차 발생량은 근로·출근 조건과 부여 기준을 확인한 뒤 계산해야 해요.";
-    r.findings.push(
-      {
-        title: "연차 산정 조건",
-        level: "check",
-        evidence:
-          "입사일, 계속근로기간, 사업장 적용 범위, 근로시간, 출근율·개근 이력에 따라 확인할 기준이 달라져요.",
-        action:
-          "조건이 확인되면 ‘연차 기준 비교·검산’에서 계산 과정을 대조하세요.",
-        source: "leave",
-      },
-      {
-        title: "회사 기준과 입사일 기준",
-        level: "info",
-        evidence:
-          "고용노동부 안내는 회계연도 운영 시 근로자에게 불리하지 않아야 하고 퇴직 시 부족분을 확인하도록 설명해요.",
-        action:
-          "회사 규정과 누적 부여·사용·소멸·기지급 내역을 함께 확인하세요.",
-        source: "leave",
-      },
-    );
-    r.checklist = [
-      "입사일과 재직·휴직 이력",
-      "근로시간·출근·개근 자료",
-      "회사 부여·비례·퇴사 정산 규정",
-      "발생·사용·소멸·수당 지급 내역",
-    ];
-  } else {
-    r.summary =
-      "근로조건 명시 기준과 실제 계약·참조 자료를 연결해서 확인하세요.";
-    r.findings.push({
-      title: "근로조건의 명시",
-      level: "info",
-      evidence:
-        "근로기준법 제17조는 임금·소정근로시간·휴일·연차 등의 명시와 해당 사항의 서면 교부를 규정해요.",
-      action:
-        "임금 구성·계산·지급방법과 참조 규정이 실제로 확인되는지 점검하세요.",
-      source: "contract",
-    });
-    r.checklist = [
-      "전체 계약서와 첨부 임금 구성표",
-      "휴게·소정근로시간·휴일의 구체적 내용",
-      "참조한 취업규칙과 제공 여부",
-      "고용형태에 따른 추가 기준과 계약 변경 이력",
-    ];
-  }
-  return r;
+  return reviewLaw(input, SOURCE_CHECKED);
 }
 
 export type SettlementLine = {
@@ -589,200 +473,10 @@ export function leaveCheck(input: LeaveInput): SupportResult {
 }
 
 export function contractCheck(text: string): SupportResult {
-  const lines = textInput(text),
-    r = base(
-      "근로계약 확인",
-      "제공한 텍스트의 핵심 항목·표현 점검. 의미 해석·전체 적법성 판정·서면 교부 사실 확인은 별도.",
-    );
-  r.sourceIds = ["contract"];
-  r.columns = ["확인 항목", "표현 점검", "원문 위치"];
-  r.context = [
-    "검토 텍스트: " + text.length + "자 / " + lines.length + "개 내용 행",
-    "자료 확인일: " + SOURCE_CHECKED,
-  ];
-  const checks: [string, RegExp, string][] = [
-    ["임금", /임금|월급|급여|연봉|시급/, "임금 구성·계산방법과 첨부 임금표"],
-    [
-      "소정근로시간",
-      /근로시간|근무시간|소정|\d{1,2}:\d{2}/,
-      "근로시간과 휴게시간의 구분",
-    ],
-    ["휴일", /휴일|주휴/, "휴일의 구체적 기준과 참조 규정"],
-    ["연차", /연차|유급휴가/, "연차 기준과 참조 규정"],
-    ["지급방법", /지급방법|계좌|이체|현금/, "계약서 다른 조항·첨부의 지급방법"],
-    [
-      "근무장소·업무",
-      /근무지|장소|담당업무|직무|종사업무/,
-      "근무 장소와 종사 업무의 구체적 내용",
-    ],
-  ];
-  for (const [title, pattern, action] of checks) {
-    const hits = lines.filter((x) => pattern.test(x.text));
-    r.rows.push([
-      title,
-      hits.length ? "관련 표현 발견 · 내용 확인 필요" : "입력 범위에서 못 찾음",
-      cite(hits) || "—",
-    ]);
-    if (!hits.length)
-      r.findings.push({
-        title: title + " 확인",
-        level: "check",
-        evidence:
-          "입력한 텍스트에서 해당 표현을 찾지 못했어요. 전체 문서의 누락으로 확정하지 않아요.",
-        action: action + "을 확인해 주세요.",
-        source: "contract",
-      });
-  }
-  const included = lines.filter((x) =>
-    /수당.*포함|포괄임금|포괄.*수당/.test(x.text),
-  );
-  if (included.length)
-    r.findings.push({
-      title: "수당 포함 조건",
-      level: "check",
-      evidence: cite(included),
-      action:
-        "구성금액·포함 근로시간·계산방법과 실제 근로 기록을 확인하세요. 포함 문구만으로 적법·위법을 판정하지 않아요.",
-      source: "contract",
-    });
-  const ref = lines.filter((x) => /규정에|운영에|취업규칙|내규/.test(x.text));
-  if (ref.length)
-    r.findings.push({
-      title: "참조 규정 확인",
-      level: "check",
-      evidence: cite(ref),
-      action: "참조 규정의 구체적 내용과 근로자에게 제공된 자료를 확인하세요.",
-      source: "contract",
-    });
-  r.summary =
-    "원문 위치와 함께 " +
-    r.findings.length +
-    "개 확인 항목을 정리했어요. 표현 발견은 내용 충족을 뜻하지 않아요.";
-  r.checklist = [
-    "전체 계약서와 첨부 자료",
-    "고용형태·근로 조건과 추가 적용 법령",
-    "임금 구성·휴게·휴일·연차의 구체적 조건",
-    "서면 교부·변경 이력과 담당자 확인",
-  ];
-  return r;
+  return reviewContract(text);
 }
-
 export function recruitmentCheck(text: string): SupportResult {
-  const lines = textInput(text),
-    r = base(
-      "채용공고 정보 점검",
-      "공고의 고용형태·근무지 명시 줄 대조와 안내 정보 점검. 채용 관련 법적 적합성 판정은 하지 않음.",
-    );
-  r.columns = ["확인 항목", "표현 점검", "원문 위치"];
-  r.context = [
-    "검토 범위: 입력 텍스트 " + text.length + "자",
-    "점검 방식: 항목별 키워드·명시 값과 위치 비교",
-  ];
-  const employment = lines.filter((x) =>
-    /고용형태|채용형태|채용구분|근무형태/.test(x.text),
-  );
-  const classify = (s: string) =>
-    /계약직|기간제/.test(s)
-      ? "계약직"
-      : /인턴/.test(s)
-        ? "인턴"
-        : /정규직/.test(s)
-          ? "정규직"
-          : "";
-  const types = new Set(
-    employment.map((x) => classify(x.text)).filter(Boolean),
-  );
-  if (types.size > 1)
-    r.findings.push({
-      title: "고용형태 불일치",
-      level: "difference",
-      evidence: cite(employment),
-      action:
-        "복수 직무·선택 고용형태인지 실제 조건이 충돌하는지 확인하고, 해당 위치에 일관되게 반영하세요.",
-    });
-  if (!employment.length)
-    r.findings.push({
-      title: "고용형태 표시",
-      level: "check",
-      evidence: "고용형태·채용형태 항목을 찾지 못했어요.",
-      action: "실제 고용형태를 명시한 위치를 확인해 주세요.",
-    });
-  const locations = lines.filter((x) =>
-    /(?:근무지|근무장소|근무 장소)\s*[:：]/.test(x.text),
-  );
-  const places = new Set(
-    locations.map((x) =>
-      x.text
-        .replace(/^.*?(?:근무지|근무장소|근무 장소)\s*[:：]/, "")
-        .trim()
-        .replace(/\s+/g, " "),
-    ),
-  );
-  if (places.size > 1)
-    r.findings.push({
-      title: "근무지 표기 차이",
-      level: "check",
-      evidence: cite(locations),
-      action:
-        "다른 위치가 같은 주소의 다른 표기인지, 복수 배치인지, 실제 불일치인지 확인하세요.",
-    });
-  const fields: [string, RegExp, string][] = [
-    ["고용형태", /정규직|계약직|기간제|인턴/, "실제 고용형태와 전환 조건"],
-    ["근무지", /근무지|근무장소|근무 장소/, "주소·배치 기준·원격근무 조건"],
-    [
-      "급여 조건",
-      /급여|연봉|시급|보수|임금/,
-      "금액 범위·협의 기준과 적용 조건",
-    ],
-    [
-      "지원 방법",
-      /지원방법|지원 방법|이메일|접수방법|접수 방법|지원.*링크/,
-      "접수 채널과 필요한 서류",
-    ],
-    ["마감 방식", /마감|채용시|채용 시|상시채용/, "마감일·상시 채용 여부"],
-    [
-      "전형 안내",
-      /면접|전형|서류.*심사|서류.*합격/,
-      "전형 절차와 일정 안내 방식",
-    ],
-  ];
-  for (const [name, p, next] of fields) {
-    const hits = lines.filter((x) => p.test(x.text));
-    r.rows.push([
-      name,
-      hits.length ? "관련 문구 발견" : "입력 범위에서 못 찾음",
-      cite(hits) || "—",
-    ]);
-    if (!hits.length)
-      r.findings.push({
-        title: name + " 안내 보완",
-        level: "check",
-        evidence: "입력한 공고에서 해당 정보를 찾지 못했어요.",
-        action:
-          next +
-          "을 확인해 주세요. 정보 품질 권장사항이며 법적 필수라는 의미는 아니에요.",
-      });
-  }
-  const probation = lines.filter((x) => /수습/.test(x.text));
-  if (probation.length)
-    r.findings.push({
-      title: "수습 조건 확인",
-      level: "check",
-      evidence: cite(probation),
-      action:
-        "수습기간·급여 조건·고용형태와 전환 조건을 구분해 설명했는지 확인하세요.",
-    });
-  r.summary =
-    "게시 전 확인할 " +
-    r.findings.length +
-    "개 항목을 원문 위치와 함께 정리했어요.";
-  r.checklist = [
-    "실제 채용 조건과 승인 내용",
-    "직무별·상단·본문·첨부의 일관성",
-    "지원자가 필요한 급여·일정·지원 방법",
-    "채용 관련 법령·개인정보·차별 표현은 별도 검토",
-  ];
-  return r;
+  return reviewRecruitment(text);
 }
 export function resultText(result: SupportResult, note: string) {
   return [
@@ -797,10 +491,22 @@ export function resultText(result: SupportResult, note: string) {
     "",
     "[확인 항목]",
     ...result.findings.map((f) =>
-      [f.title, f.evidence, "다음 행동: " + f.action].join("\n"),
+      [
+        f.title,
+        f.evidence,
+        ...(f.reason ? ["이유: " + f.reason] : []),
+        "다음 행동: " + f.action,
+        ...(f.suggestion ? ["수정·확인 예시: " + f.suggestion] : []),
+        ...(f.source
+          ? [sources[f.source].law + " " + sources[f.source].url]
+          : []),
+      ].join("\n"),
     ),
     "",
     "[준비할 자료·체크리스트]",
+    ...(result.steps || []).map(
+      (step, i) => "처리 순서 " + (i + 1) + ": " + step,
+    ),
     ...result.checklist.map((x) => "- " + x),
     ...result.sourceIds.map(
       (id) =>

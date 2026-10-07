@@ -1,3 +1,4 @@
+import { openBasicSample, openSavedWorks } from "../navigation";
 import { test, expect } from "@playwright/test";
 import ExcelJS from "exceljs";
 import { readFile } from "node:fs/promises";
@@ -12,9 +13,7 @@ test("editing during an account save keeps newer text marked as unsaved", async 
     },
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   const notes = page.getByLabel("담당자 설명·의견");
   await notes.fill("저장 요청 시점의 문장");
@@ -57,9 +56,7 @@ test("guest work and company format survive login; explicit saving restores them
   const password = "synthetic-restore-password-12345",
     username = "restore" + Date.now();
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page.getByLabel("담당자 설명·의견").fill("로그인 전 작성한 의견");
   await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
@@ -140,7 +137,7 @@ test("guest work and company format survive login; explicit saving restores them
     expect(r.status()).toBe(200);
     const p = await other.newPage();
     await p.goto("/");
-    await p.getByRole("button", { name: "저장한 작업", exact: true }).click();
+    await openSavedWorks(p);
     await p.getByRole("button", { name: "열기", exact: true }).click();
     await p.getByRole("tab", { name: "보고서", exact: true }).click();
     await expect(p.getByLabel("담당자 설명·의견")).toHaveValue(

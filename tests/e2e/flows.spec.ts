@@ -1,10 +1,11 @@
+import { openBasicSample, openNewWork, openSavedWorks, openInquiry } from "../navigation";
 import { test, expect } from "@playwright/test";
 
 test("wide monthly cost file can be reshaped in the UI without editing its original", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
+  await openNewWork(page);
   await page.getByLabel("파일 업로드").setInputFiles({
     name: "wide.csv",
     mimeType: "text/csv",
@@ -60,9 +61,7 @@ test("saved share login, restricted access, viewer filtering and permission revo
     await reg(stranger, "shareother");
     const p = await owner.newPage();
     await p.goto("/");
-    await p
-      .getByRole("button", { name: "샘플로 체험하기", exact: true })
-      .click();
+    await openBasicSample(p);
     await p.getByRole("button", { name: "최종 확인·내보내기" }).click();
     await p
       .getByLabel(
@@ -103,9 +102,7 @@ test("save failure and expired session preserve the edited report", async ({
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page
     .getByLabel("담당자 설명·의견")
@@ -158,16 +155,14 @@ test("guest sample, report editing, linked filters, chart editor and PDF downloa
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "기존 인사 자료에서, 대시보드와 보고서까지.",
+      name: "HRBIP", exact: true,
     }),
   ).toBeVisible();
   await page.screenshot({
     path: "artifacts/verification/home-desktop.png",
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await expect(
     page.getByRole("heading", { name: "2026년 3분기 인사현황", exact: true }),
   ).toBeVisible();
@@ -228,7 +223,7 @@ test("CSV upload: mapping, invalid cell correction, criteria, result and XLSX ex
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
+  await openNewWork(page);
   const csv =
     "사번,입사일,퇴사일,부서,고용형태\nA,2026-01-01,,인사,정규직\nB,2026-02-30,2026-09-30,인사,계약직";
   await page.getByLabel("파일 업로드").setInputFiles({
@@ -282,7 +277,7 @@ test("XLSX multiple sheets and flexible headers", async ({ page }) => {
   await mkdir("artifacts/verification", { recursive: true });
   await wb.xlsx.writeFile("artifacts/verification/upload-fixture.xlsx");
   await page.goto("/");
-  await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
+  await openNewWork(page);
   await page
     .getByLabel("파일 업로드")
     .setInputFiles("artifacts/verification/upload-fixture.xlsx");
@@ -313,9 +308,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
 }) => {
   const username = "tester" + Date.now();
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page
     .getByRole("button", { name: "로그인하고 계정에 저장", exact: true })
     .click();
@@ -338,10 +331,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
     .getByRole("dialog")
     .getByRole("button", { name: "템플릿 저장", exact: true })
     .click();
-  await page
-    .getByRole("navigation", { name: "워크스페이스" })
-    .getByRole("button", { name: "저장한 작업", exact: true })
-    .click();
+  await openSavedWorks(page);
   await page.getByRole("button", { name: "열기", exact: true }).click();
   await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
@@ -354,24 +344,19 @@ test("real registration, save/reopen, template reuse without old data, feature r
   );
   await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
-  await page
-    .getByRole("navigation", { name: "워크스페이스" })
-    .getByRole("button", { name: "저장한 작업", exact: true })
-    .click();
+  await openSavedWorks(page);
   await page.getByRole("button", { name: "새 데이터 적용" }).click();
   await expect(
     page.getByRole("heading", { name: "어떤 자료로 시작할까요?" }),
   ).toBeVisible();
   await expect(page.getByText("현재 작업에 연결한 표")).toHaveCount(0);
+  await openInquiry(page);
   await page
-    .getByRole("button", { name: "기능 제안하기", exact: true })
-    .click();
-  await page
-    .getByLabel("원하는 기능", { exact: true })
+    .getByLabel("문의 내용 또는 기능 제안", { exact: true })
     .fill("테스트: 휴가 사용 추이를 비교하고 싶어요.");
-  await page.getByRole("button", { name: "기능 요청 저장" }).click();
+  await page.getByRole("button", { name: "문의·제안 남기기" }).click();
   await expect(
-    page.getByText(/HRBIP의 기능 요청함에 저장했습니다/),
+    page.getByRole("status").filter({ hasText: "문의 기록 폴더에 저장했어요" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   await page.setViewportSize({ width: 375, height: 812 });
@@ -385,9 +370,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.screenshot({
     path: "artifacts/verification/dashboard-mobile.png",
     fullPage: true,
@@ -399,7 +382,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
   ).toBe(true);
 });
 
-test("workspace navigation stays available on mobile and login returns to saved work", async ({
+test("top navigation stays available on mobile and login returns to saved work", async ({
   page,
 }) => {
   const username = "history" + Date.now();
@@ -411,20 +394,18 @@ test("workspace navigation stays available on mobile and login returns to saved 
   await page.request.post("/api/auth/logout", { data: {} });
   await page.goto("/");
   const header = page.getByRole("banner");
-  await expect(header.getByRole("button")).toHaveCount(2);
-  await expect(header.getByRole("navigation")).toHaveCount(0);
+  await expect(header.getByRole("button")).toHaveCount(5);
+  await expect(header.getByRole("navigation")).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "새 보고서", exact: true }),
   ).toHaveCount(0);
-  const workspace = page.getByRole("navigation", { name: "워크스페이스" });
-  await expect(workspace.getByRole("button")).toHaveCount(3);
+  const workspace = page.getByRole("navigation", { name: "주요 기능" });
+  await expect(workspace.locator(".site-nav-trigger")).toHaveCount(3);
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const button of await workspace.getByRole("button").all()) {
+  for (const button of await workspace.locator(".site-nav-trigger").all()) {
     await expect(button).toBeInViewport();
   }
-  await workspace
-    .getByRole("button", { name: "저장한 작업", exact: true })
-    .click();
+  await openSavedWorks(page);
   await page
     .getByRole("button", { name: "로그인하고 계정 작업 보기", exact: true })
     .click();

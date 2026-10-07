@@ -1,3 +1,4 @@
+import { openBasicSample, openSavedWorks } from "../navigation";
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import pptxgen from "pptxgenjs";
@@ -15,9 +16,7 @@ test("register PPT and Excel formats, persist/reopen, verify and export company 
     },
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page
     .getByRole("button", { name: "회사 양식 등록·적용", exact: true })
     .click();
@@ -129,10 +128,7 @@ test("register PPT and Excel formats, persist/reopen, verify and export company 
     .getByRole("button", { name: "닫기", exact: true })
     .click();
   await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
-  await page
-    .getByRole("navigation", { name: "워크스페이스" })
-    .getByRole("button", { name: "저장한 작업", exact: true })
-    .click();
+  await openSavedWorks(page);
   await page.getByRole("button", { name: "열기", exact: true }).first().click();
   await expect(
     page.getByRole("button", {
@@ -147,9 +143,7 @@ test("mobile verification and format registration are accessible and do not over
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByRole("button", { name: "계산 검증·검증표" }).click();
   await expect(
     page.getByText("계산 대조가 끝났어요.", { exact: false }),

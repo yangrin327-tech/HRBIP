@@ -6,6 +6,7 @@ import express from "express";
 import { serverConfig } from "./config.js";
 import { postgresStore, sqliteStore } from "./database.js";
 import { noStorage } from "./guest.js";
+import { fileInquiryWriter } from "./inquiries.js";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 else if (existsSync(".env")) process.loadEnvFile(".env");
 const { port, host, origin, publicDemo, guestMode, trustProxyHops } =
@@ -22,6 +23,7 @@ const app = createApp(db, {
   publicDemo,
   guestMode,
   trustProxyHops,
+  inquiryWriter: publicDemo ? undefined : fileInquiryWriter(),
 });
 if (production) {
   app.use(express.static(resolve("dist")));

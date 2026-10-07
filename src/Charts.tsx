@@ -48,14 +48,14 @@ export function DataChart({
       <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="#e6ebe3" />
       <XAxis
         dataKey="label"
-        tick={{ fontSize: 14, fill: "#52665b" }}
+        tick={{ fontSize: 16, fill: "#3a413d" }}
         tickLine={false}
         axisLine={false}
         minTickGap={16}
       />
       <YAxis
         width={88}
-        tick={{ fontSize: 14, fill: "#52665b" }}
+        tick={{ fontSize: 16, fill: "#3a413d" }}
         tickLine={false}
         axisLine={false}
         tickFormatter={(v) =>
@@ -69,12 +69,12 @@ export function DataChart({
         contentStyle={{
           border: "1px solid #d5e2d4",
           borderRadius: 12,
-          fontSize: 14,
+          fontSize: 16,
         }}
       />
       <Legend
         iconType="circle"
-        wrapperStyle={{ fontSize: 14, paddingTop: 12 }}
+        wrapperStyle={{ fontSize: 16, paddingTop: 12 }}
       />
     </>
   );
@@ -104,7 +104,7 @@ export function DataChart({
               ))}
             </Pie>
             <Tooltip formatter={formatter} />
-            <Legend wrapperStyle={{ fontSize: 14 }} />
+            <Legend wrapperStyle={{ fontSize: 16 }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -128,7 +128,7 @@ export function DataChart({
             />
             <XAxis
               type="number"
-              tick={{ fontSize: 14 }}
+              tick={{ fontSize: 16 }}
               tickFormatter={(v) =>
                 Math.abs(v) >= 1000000 ? v / 1000000 + "백만" : v
               }
@@ -139,7 +139,7 @@ export function DataChart({
               type="category"
               dataKey="label"
               width={94}
-              tick={{ fontSize: 14, fill: "#52665b" }}
+              tick={{ fontSize: 16, fill: "#3a413d" }}
               axisLine={false}
               tickLine={false}
             />

@@ -9,6 +9,7 @@ export const lawExample: LawInput = {
   eventDate: "2026-10-07",
   agreement: "no",
   endMeaning: "ended",
+  plannedDate: "2026-10-20",
 };
 export const lineExamples: SettlementLine[] = [
   {
@@ -73,7 +74,24 @@ export const recruitmentExample = [
   "본문 근무지: 서울 강남 가상로 10",
   "담당업무: 인사 운영 및 자료 정리",
   "급여: 연봉 3600만원(가상 예시)",
-  "지원 방법: 채용 페이지 지원 링크로 이력서 접수",
+  "지원 방법: https://example.com/careers/hr 에서 이력서 접수(가상 경로)",
   "마감: 2026년 10월 31일",
   "전형: 서류 심사 → 실무 면접 → 결과 안내",
+].join("\n");
+export const contractReviewExample = [
+  "근무장소: 서울 가상로 10. 담당업무: 인사 운영 지원.",
+  "근무시간: 월~금 09:00~18:00. 휴게시간: 12:00~12:30.",
+  "임금: 기본급 280만원, 식대 20만원. 월 지급액 320만원. 모든 수당을 포함한다.",
+  "지급방법: 매월 25일 본인 명의 계좌로 이체.",
+  "휴일·연차는 회사 규정에 따른다.",
+].join("\n");
+export const recruitmentReviewExample = [
+  "상단 고용형태: 정규직",
+  "본문 고용형태: 6개월 계약직 후 정규직 전환 검토",
+  "근무지: 추후 안내",
+  "담당업무: 인사 자료 정리 및 채용 운영 지원",
+  "급여: 회사 내규에 따라 협의",
+  "지원 방법: 지원 링크에서 접수",
+  "마감: 추후 안내",
+  "전형: 서류 → 면접",
 ].join("\n");

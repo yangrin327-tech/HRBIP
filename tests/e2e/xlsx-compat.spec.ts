@@ -1,3 +1,4 @@
+import { openNewWork } from "../navigation";
 import { test, expect } from "@playwright/test";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
@@ -76,7 +77,7 @@ test("qualified SpreadsheetML imports sheets, dates, numbers and literal text", 
   );
   expect(verified.worksheets).toHaveLength(2);
   expect(verified.getWorksheet("지급 내역")!.getTable("PayTable")).toBeTruthy();
-  await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
+  await openNewWork(page);
   await page.getByLabel("파일 업로드").setInputFiles({
     name: "namespace.xlsx",
     mimeType:
@@ -100,7 +101,7 @@ test("invalid XLSX gives a recovery message rather than an internal property err
   const zip = new JSZip();
   zip.file("xl/workbook.xml", "<not-a-workbook/>");
   await page.goto("/");
-  await page.getByRole("button", { name: "내 자료로 시작하기" }).click();
+  await openNewWork(page);
   await page.getByLabel("파일 업로드").setInputFiles({
     name: "invalid.xlsx",
     mimeType:

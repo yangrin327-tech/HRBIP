@@ -1,3 +1,4 @@
+import { openBasicSample } from "../navigation";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
@@ -6,9 +7,7 @@ test("home and dashboard accessibility audit", async ({ page }) => {
   const home = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   const dashboard = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();

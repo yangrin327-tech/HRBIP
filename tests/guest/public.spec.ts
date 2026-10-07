@@ -1,3 +1,4 @@
+import { openBasicSample, openInquiry } from "../navigation";
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import pptxgen from "pptxgenjs";
@@ -9,7 +10,7 @@ import "../e2e/integrated-upload.spec";
 import "../e2e/sample-large.spec";
 import "../e2e/accessibility.spec";
 
-test("public mode exposes no account actions; sample, edits, exports and external feedback work", async ({
+test("account-disabled mode supports sample, edits, exports and inline feedback", async ({
   page,
 }) => {
   const requests: string[] = [];
@@ -18,26 +19,20 @@ test("public mode exposes no account actions; sample, edits, exports and externa
   });
   await page.goto("/");
   await expect(
-    page.getByText("가입 없이 바로 사용", { exact: true }),
+    page.getByText("샘플 체험은 로그인 없이 사용할 수 있어요.", { exact: true }),
   ).toBeVisible();
   for (const label of ["로그인"])
     await expect(
       page.getByRole("button", { name: label, exact: true }),
     ).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "기능 제안하기", exact: false })
-    .first()
-    .click();
-  await expect(
-    page.getByRole("link", { name: "GitHub에서 제안 작성하기 ↗" }),
-  ).toHaveAttribute(
-    "href",
-    "https://github.com/yangrin327-tech/HRBIP/issues/new",
-  );
+  await openInquiry(page);
+  const inquiry = page.getByRole("dialog", { name: "문의·기능 제안" });
+  await expect(inquiry.getByRole("link")).toHaveCount(0);
+  await inquiry.getByLabel("문의 내용 또는 기능 제안").fill("[가상 검증] 사이트 안에서 문의를 저장합니다.");
+  await inquiry.getByRole("button", { name: "문의·제안 남기기" }).click();
+  await expect(inquiry.getByRole("status")).toContainText("문의 기록 폴더에 저장했어요");
   await page.getByRole("button", { name: "닫기", exact: true }).click();
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   for (const label of ["공유"])
     await expect(
       page.getByRole("button", { name: label, exact: true }),
@@ -74,7 +69,7 @@ test("public mode exposes no account actions; sample, edits, exports and externa
   );
   expect(
     requests.some((p) =>
-      /\/api\/(works|auth|templates|transfers|requests)/.test(p),
+      /\/api\/(works|auth|templates|transfers)/.test(p),
     ),
   ).toBe(false);
   expect(await page.context().cookies()).toHaveLength(0);
@@ -91,9 +86,7 @@ test("guest company PPTX and XLSX export editable values and persist bindings af
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page
     .getByRole("button", { name: "회사 양식 등록·적용", exact: true })
     .click();

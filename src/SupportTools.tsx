@@ -11,12 +11,15 @@ import {
 } from "lucide-react";
 import { Button, Notice, PageTitle } from "./ui";
 import { UsageGuide } from "./UsageGuide";
+import "./support-review.css";
 import {
   lawExample,
   settlementExample,
   leaveExample,
   contractExample,
   recruitmentExample,
+  contractReviewExample,
+  recruitmentReviewExample,
 } from "../shared/support-samples";
 import { parseFile, type RawSheet } from "./files";
 import {
@@ -547,6 +550,15 @@ export function SupportToolPage({
           eventDate: v("eventDate"),
           agreement: v("agreement", "unknown") as LawInput["agreement"],
           endMeaning: v("endMeaning", "unknown") as LawInput["endMeaning"],
+          plannedDate: v("plannedDate"),
+          workers: v("workers", "unknown") as LawInput["workers"],
+          weeklyHours: v("weeklyHours"),
+          tenure: v("tenure", "unknown") as LawInput["tenure"],
+          attendance: v("attendance", "unknown") as LawInput["attendance"],
+          contractIssue: v(
+            "contractIssue",
+            "auto",
+          ) as LawInput["contractIssue"],
         });
       else if (id === "settlement")
         next = settlementCheck(lines, v("claimed"), v("scope"));
@@ -642,21 +654,54 @@ export function SupportToolPage({
             ["contract", "근로조건 명시"],
           ])}
           {field("eventDate", "사건 기준일 (모르면 비워두기)", "date")}
-          {select("endMeaning", "입력 날짜의 의미", "unknown", [
-            ["unknown", "미확인 / 해당 없음"],
-            ["last", "마지막 근무·재직일"],
-            ["ended", "근로관계 종료 시점"],
-          ])}
-          {select("agreement", "지급기일 연장 합의", "unknown", [
-            ["unknown", "모름 / 해당 없음"],
-            ["yes", "있음 · 효력은 별도 확인"],
-            ["no", "없음"],
-          ])}
+          {v("topic", "payment") === "payment" && (
+            <>
+              {select("endMeaning", "입력 날짜의 의미", "unknown", [
+                ["unknown", "미확인 / 해당 없음"],
+                ["last", "마지막 근무·재직일"],
+                ["ended", "근로관계 종료 시점"],
+              ])}
+              {select("agreement", "지급기일 연장 합의", "unknown", [
+                ["unknown", "모름 / 해당 없음"],
+                ["yes", "있음 · 효력은 별도 확인"],
+                ["no", "없음"],
+              ])}
+              {field("plannedDate", "지급 예정일 (비교하려면 입력)", "date")}
+            </>
+          )}
+          {v("topic", "payment") === "leave" && (
+            <>
+              {select("workers", "상시근로자 수", "unknown", [
+                ["unknown", "아직 확인하지 않음"],
+                ["under5", "5인 미만"],
+                ["fivePlus", "5인 이상"],
+              ])}
+              {field("weeklyHours", "4주 평균 주 소정근로시간", "number")}
+              {select("tenure", "계속근로기간", "unknown", [
+                ["unknown", "아직 확인하지 않음"],
+                ["underYear", "1년 미만"],
+                ["yearPlus", "1년 이상"],
+              ])}
+              {select("attendance", "1년간 출근율", "unknown", [
+                ["unknown", "아직 확인하지 않음 / 해당 없음"],
+                ["under80", "80% 미만"],
+                ["atLeast80", "80% 이상"],
+              ])}
+            </>
+          )}
+          {v("topic", "payment") === "contract" &&
+            select("contractIssue", "근로조건 세부 쟁점", "auto", [
+              ["auto", "질문의 표현으로 쟁점 제안"],
+              ["written", "서면 명시·교부"],
+              ["includedPay", "수당 포함 약정"],
+              ["rest", "근무·휴게시간"],
+              ["penalty", "퇴사 위약금·손해배상 약정"],
+            ])}
         </div>
         <Notice>
-          지급기한·연차·근로조건 명시를 지원해요. 공식 자료 확인일은{" "}
-          {SOURCE_CHECKED}이며 실시간 법령 검색이나 외부 AI 답변이 아니에요.
-          다른 주제와 사건 시점의 변경 법령은 공식 자료·상담에서 확인하세요.
+          선택한 쟁점의 조건을 확인해 적용 기준·필요한 자료·처리 순서를
+          정리해요. 모르는 조건은 미확인으로 남겨두세요. 공식 자료 확인일은{" "}
+          {SOURCE_CHECKED}이에요.
         </Notice>
       </>
     );
@@ -858,8 +903,8 @@ export function SupportToolPage({
         </p>
         <Notice>
           {id === "contract"
-            ? "핵심 표현과 명시 항목을 점검해요. 표현 발견은 기준 충족을 뜻하지 않고 전체 계약의 적법성을 자동 판정하지 않아요."
-            : "고용형태·근무지 비교와 안내 정보 점검이에요. 정보 보완 권장사항과 법적 의무를 구분하며, 법적 적합성·지원자 평가는 하지 않아요."}
+            ? "금액·시간 검산, 빠진 조건·참조 규정·수당 포함 약정을 확인해 원문과 이유, 수정 예시를 보여줘요. 전체 계약과 실제 근로 내역의 법적 검토는 별도예요."
+            : "고용형태·급여 표기 충돌, 모호한 조건과 접수·마감 정보를 찾아 보완 예시를 보여줘요. 안내 품질 권장사항이며 법적 필수 항목이라는 의미는 아니에요."}
         </Notice>
       </>
     );
@@ -904,6 +949,22 @@ export function SupportToolPage({
             <Button type="button" onClick={sample}>
               가상 예시 불러오기
             </Button>
+            {(id === "contract" || id === "recruitment") && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() =>
+                  update({
+                    text:
+                      id === "contract"
+                        ? contractReviewExample
+                        : recruitmentReviewExample,
+                  })
+                }
+              >
+                점검이 필요한 예시
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -975,12 +1036,31 @@ function SupportOutput({
         });
       });
       const findings = wb.addWorksheet("확인 항목");
-      findings.addRow(["항목", "상태", "근거·원문 위치", "다음 행동"]);
+      findings.addRow([
+        "항목",
+        "상태",
+        "근거·원문 위치",
+        "이유",
+        "다음 행동",
+        "수정·확인 예시",
+        "공식 근거",
+      ]);
       result.findings.forEach((f) =>
-        findings.addRow([f.title, names[f.level], f.evidence, f.action]),
+        findings.addRow([
+          f.title,
+          names[f.level],
+          f.evidence,
+          f.reason || "",
+          f.action,
+          f.suggestion || "",
+          f.source ? sources[f.source].law + " " + sources[f.source].url : "",
+        ]),
       );
       const checklist = wb.addWorksheet("담당자 확인");
       result.checklist.forEach((x) => checklist.addRow([x]));
+      result.steps?.forEach((x, i) =>
+        checklist.addRow(["처리 순서 " + (i + 1), x]),
+      );
       checklist.addRow(["담당자 의견", note]);
       for (const s of wb.worksheets) {
         s.columns.forEach((c) => (c.width = 36));
@@ -1009,6 +1089,48 @@ function SupportOutput({
     unverified: "미검증",
     info: "안내·계산 확인",
   };
+  const findingCards = (
+    <div className="support-findings">
+      {result.findings.map((f, i) => (
+        <article key={i} className={"support-finding status-" + f.level}>
+          <span className="tag">{names[f.level]}</span>
+          <h3>{f.title}</h3>
+          <p className="support-evidence">
+            <strong>확인 근거·원문</strong>
+            {"\n"}
+            {f.evidence}
+          </p>
+          {f.reason && (
+            <p className="support-review-reason">
+              <strong>왜 확인해야 하나요?</strong> {f.reason}
+            </p>
+          )}
+          <p>
+            <strong>다음 행동</strong> · {f.action}
+          </p>
+          {f.suggestion && (
+            <div className="support-review-suggestion">
+              <strong>
+                {result.presentation === "guide"
+                  ? "확인 요청·기록 예시"
+                  : "수정·보완 예시"}
+              </strong>
+              <p>{f.suggestion}</p>
+              <small>
+                대괄호에는 확인한 실제 조건을 넣으세요. 자동 확정 문구가 아닌
+                검토용 예시예요.
+              </small>
+            </div>
+          )}
+          {f.source && (
+            <a href={sources[f.source].url} target="_blank" rel="noreferrer">
+              {sources[f.source].law} · {sources[f.source].name} ↗
+            </a>
+          )}
+        </article>
+      ))}
+    </div>
+  );
   return (
     <section className="panel support-output" aria-label="업무 지원 점검 결과">
       <h2>점검 결과</h2>
@@ -1022,10 +1144,25 @@ function SupportOutput({
           ))}
         </ul>
       </details>
+      {!!result.steps?.length && (
+        <section className="support-review-steps" aria-label="상황별 처리 순서">
+          <h3>지금 할 일, 이 순서로 확인하세요.</h3>
+          <ol>
+            {result.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {result.presentation && findingCards}
       {result.rows.length > 0 && (
         <div className="support-table-wrap">
           <table>
-            <caption>입력 자료·계산 대조표</caption>
+            <caption>
+              {result.presentation
+                ? "조건별 점검·검산"
+                : "입력 자료·계산 대조표"}
+            </caption>
             <thead>
               <tr>
                 {result.columns.map((column) => (
@@ -1053,23 +1190,7 @@ function SupportOutput({
           </table>
         </div>
       )}
-      <div className="support-findings">
-        {result.findings.map((f, i) => (
-          <article key={i} className={"support-finding status-" + f.level}>
-            <span className="tag">{names[f.level]}</span>
-            <h3>{f.title}</h3>
-            <p className="support-evidence">{f.evidence}</p>
-            <p>
-              <strong>다음 행동</strong> · {f.action}
-            </p>
-            {f.source && (
-              <a href={sources[f.source].url} target="_blank" rel="noreferrer">
-                {sources[f.source].name} ↗
-              </a>
-            )}
-          </article>
-        ))}
-      </div>
+      {!result.presentation && findingCards}
       <h3>준비할 자료·체크리스트</h3>
       <ul>
         {result.checklist.map((x) => (

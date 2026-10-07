@@ -1,3 +1,4 @@
+import { openBasicSample, openSavedWorks } from "../navigation";
 import { test, expect } from "@playwright/test";
 
 test("report edits and filters survive reload, a new tab, and switching saved works", async ({
@@ -5,9 +6,7 @@ test("report edits and filters survive reload, a new tab, and switching saved wo
   context,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByLabel("시작 월", { exact: true }).fill("2026-08");
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page
@@ -31,13 +30,13 @@ test("report edits and filters survive reload, a new tab, and switching saved wo
   await second.close();
   // A freshly opened tab updates its revision; reopen to use the latest version.
   await page.reload();
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await expect(page.locator(".saved-list article")).toHaveCount(1);
   await page.getByRole("button", { name: "새 작업", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "어떤 자료로 시작할까요?" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await expect(page.locator(".saved-list article")).toHaveCount(2);
   await page
     .locator(".saved-list article")
@@ -65,20 +64,18 @@ test("uploaded sheets and selections survive reload before mapping; templates co
   await expect(
     page.getByText("private.csv", { exact: false }).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await page.reload();
   await expect(
     page.getByText("private.csv", { exact: false }).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "모든 도구", exact: true }).click();
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await page.getByRole("button", { name: "HRBIP 홈", exact: true }).click();
+  await openBasicSample(page);
   await page.getByRole("button", { name: "템플릿 저장", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "구성을 템플릿으로 저장" });
   await modal.getByLabel("템플릿 이름").fill("월간 보고 구성");
   await modal.getByRole("button", { name: "템플릿 저장", exact: true }).click();
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await expect(
     page.getByRole("heading", { name: "월간 보고 구성" }),
   ).toBeVisible();
@@ -103,9 +100,7 @@ test("storage failure is visible and never labelled saved", async ({
   });
   page.on("dialog", (d) => d.accept());
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await expect(page.locator(".save-state")).toContainText(
     "자동 저장에 실패했어요",
   );
@@ -120,9 +115,7 @@ test("another tab cannot silently overwrite edits; a separate copy can be saved"
   context,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
   const second = await context.newPage();
   await second.goto("/");
@@ -137,7 +130,7 @@ test("another tab cannot silently overwrite edits; a separate copy can be saved"
   );
   await page.getByRole("button", { name: "사본 저장", exact: true }).click();
   await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await expect(page.locator(".saved-list article")).toHaveCount(2);
 });
 
@@ -145,17 +138,15 @@ test("deleting an active saved work does not resurrect it after reload", async (
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "2026년 3분기 인사현황 삭제", exact: true })
     .click();
   await expect(page.locator(".saved-list article")).toHaveCount(0);
   await page.reload();
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await expect(page.locator(".saved-list article")).toHaveCount(0);
 });

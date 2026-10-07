@@ -1,3 +1,5 @@
+import { openBasicSample, openSavedWorks } from "../navigation";
+import { openSupportTool } from "../navigation";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import ExcelJS from "exceljs";
@@ -27,13 +29,13 @@ test("home exposes five separate support buttons and removes the previous three"
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "추가 업무 지원 도구", exact: true }),
+    page.locator("#support-title"),
   ).toBeVisible();
   for (const title of titles)
     await expect(
-      page.getByRole("button", { name: title + " 열기", exact: true }),
+      page.locator("#support-intro").getByRole("button", { name: title, exact: true }),
     ).toBeVisible();
-  await expect(page.locator(".quick-tool-card")).toHaveCount(5);
+  await expect(page.locator(".landing-support-buttons .button")).toHaveCount(5);
   await page.screenshot({
     path: "artifacts/verification/hr-support/home.png",
     fullPage: true,
@@ -45,17 +47,15 @@ test("home exposes five separate support buttons and removes the previous three"
     "인사 문서 작성기",
   ])
     await expect(page.getByText(label, { exact: true })).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "근로계약 확인 열기", exact: true })
-    .click();
+  await openSupportTool(page, "근로계약 확인");
   await expect(page).toHaveURL(/#tools\/contract$/);
   await page.goBack();
   await expect(
-    page.getByRole("heading", { name: "추가 업무 지원 도구", exact: true }),
+    page.locator("#support-title"),
   ).toBeVisible();
   await page.goto("/#tools/dates");
   await expect(
-    page.getByRole("heading", { name: "추가 업무 지원 도구", exact: true }),
+    page.locator("#support-title"),
   ).toBeVisible();
 });
 
@@ -323,23 +323,18 @@ test("support navigation retains the dashboard report and filters", async ({
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByLabel("시작 월", { exact: true }).fill("2026-08");
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page.getByLabel("담당자 설명·의견").fill("대표 도구 의견 유지");
   await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
-  await page
-    .getByRole("navigation", { name: "추가 업무 지원 도구", exact: true })
-    .getByRole("button", { name: "퇴사 정산 검토", exact: true })
-    .click();
+  await openSupportTool(page, "퇴사 정산 검토");
   await page
     .getByRole("button", { name: "가상 예시 불러오기", exact: true })
     .click();
   await page.getByRole("button", { name: "입력 자료 점검하기" }).click();
   await expect(output(page)).toContainText("2,130,000원");
-  await page.getByRole("button", { name: "저장한 작업", exact: true }).click();
+  await openSavedWorks(page);
   await page
     .locator(".saved-list article")
     .filter({ hasText: "2026년 3분기 인사현황" })

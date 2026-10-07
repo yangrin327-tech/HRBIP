@@ -32,6 +32,7 @@ import { exportVerification } from "./verification-export.js";
 import { FormatError } from "./office-xml.js";
 import { verifyOfficeOutput } from "./verify-output.js";
 import { prepareGuestFormat } from "./guest.js";
+import type { InquiryRecord } from "./inquiries.js";
 import {
   installTransfers,
   streamLargeResponses,
@@ -82,6 +83,7 @@ export function createApp(
     publicDemo?: boolean;
     guestMode?: boolean;
     trustProxyHops?: number;
+    inquiryWriter?: (record: InquiryRecord) => Promise<void>;
   } = {},
 ) {
   const db: Store = "transaction" in input ? input : sqliteStore(input);
@@ -158,6 +160,7 @@ export function createApp(
       "POST /export/pptx",
       "POST /export/xlsx",
     ]);
+    if (options.inquiryWriter) routes.add("POST /requests");
     app.use("/api", (req, _res, next) => {
       // Includes old authenticated sessions and all original/download/share paths.
       if (!routes.has(req.method + " " + req.path.replace(/\/$/, "")))
@@ -655,13 +658,15 @@ export function createApp(
       const body = z
         .object({ message: z.string().trim().min(5).max(2000) })
         .parse(req.body);
-      const id = randomUUID();
-      await db
-        .prepare("INSERT INTO requests VALUES(?,?,?)")
-        .run(id, body.message, new Date().toISOString());
+      const id = randomUUID(), created = new Date().toISOString();
+      if (options.inquiryWriter) {
+        await options.inquiryWriter({ id, message: body.message, created });
+      } else {
+        await db.prepare("INSERT INTO requests VALUES(?,?,?)").run(id, body.message, created);
+      }
       res.status(201).json({
         id,
-        message: "HRBIP의 기능 요청함에 저장했습니다.",
+        message: options.inquiryWriter ? "프로젝트의 문의 기록 폴더에 저장했어요." : "HRBIP의 비공개 문의 기록함에 저장했어요.",
       });
     },
   );

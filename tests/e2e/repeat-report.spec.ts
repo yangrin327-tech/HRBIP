@@ -1,3 +1,4 @@
+import { openBasicSample, openNewWork, openSavedWorks } from "../navigation";
 import { test, expect } from "@playwright/test";
 import ExcelJS from "exceljs";
 import AxeBuilder from "@axe-core/playwright";
@@ -13,9 +14,7 @@ test("repeat saved report with renamed columns uses only new rows and exports pr
   });
   expect(registered.status()).toBe(201);
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "샘플로 체험하기", exact: true })
-    .click();
+  await openBasicSample(page);
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page
     .getByLabel("담당자 설명·의견", { exact: true })
@@ -26,10 +25,7 @@ test("repeat saved report with renamed columns uses only new rows and exports pr
   const old = await (
     await page.request.get("/api/works/" + initial[0].id)
   ).json();
-  await page
-    .getByRole("navigation", { name: "워크스페이스" })
-    .getByRole("button", { name: "저장한 작업", exact: true })
-    .click();
+  await openSavedWorks(page);
   await page
     .getByRole("button", { name: "새 자료로 반복 보고", exact: true })
     .click();
@@ -128,10 +124,7 @@ test("repeat saved report with renamed columns uses only new rows and exports pr
   expect(restored.workspace.datasets[0].rows).toHaveLength(2);
   expect(JSON.stringify(restored.workspace.datasets)).not.toContain("E001");
   await page.reload();
-  await page
-    .getByRole("navigation", { name: "워크스페이스" })
-    .getByRole("button", { name: "저장한 작업", exact: true })
-    .click();
+  await openSavedWorks(page);
   await page
     .locator(".saved-list article")
     .filter({ hasText: "10월 검토 완료 보고서" })
@@ -145,9 +138,7 @@ test("metric evidence and document preview remain accessible on a phone", async 
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "내 자료로 시작하기", exact: true })
-    .click();
+  await openNewWork(page);
   await expect(
     page.getByRole("region", { name: "업로드 전 준비 안내" }),
   ).toBeVisible();

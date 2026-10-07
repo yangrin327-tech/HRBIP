@@ -53,6 +53,9 @@ import { Button, Notice, Modal, PageTitle } from "./ui";
 import { DataInput } from "./DataInput";
 import { DataReview } from "./DataReview";
 import { Results } from "./Results";
+import { HomePage } from "./HomePage";
+import { InquiryForm } from "./InquiryForm";
+import { SiteNavigation, type ResultView } from "./SiteNavigation";
 import { prepareRepeat, type ReusePlan } from "../shared/reuse";
 import { RepeatReview } from "./RepeatReview";
 import {
@@ -74,6 +77,7 @@ type Stored = {
 };
 type Template = { id: string; title: string; design: Design };
 export default function App() {
+  const [resultEntry, setResultEntry] = useState<{ view: ResultView; revision: number }>({ view: "dashboard", revision: 0 });
   const [w, rawSetW] = useState<Workspace>(emptyWorkspace),
     [route, setRoute] = useState(() =>
       toolFromHash() ? "tool:" + toolFromHash() : "home",
@@ -268,6 +272,26 @@ export default function App() {
       window.removeEventListener("hashchange", syncRoute);
     };
   }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle("home-scroll", route === "home");
+    return () => document.documentElement.classList.remove("home-scroll");
+  }, [route]);
+  function openResult(view: ResultView, sample = false) {
+    if (sample) {
+      if (!canReplace()) return;
+      setResultEntry({ view, revision: Date.now() });
+      openWorkspace(sampleWorkspace(), "result");
+    } else if (!shared && w.datasets.length && w.basisConfirmed) {
+      setResultEntry({ view, revision: Date.now() });
+      navigate("result");
+    } else {
+      if (!canReplace()) return;
+      setResultEntry({ view, revision: Date.now() });
+      openWorkspace(emptyWorkspace(), "input");
+    }
+  }
+  function beginInput() { setResultEntry({ view: "dashboard", revision: Date.now() }); start(); }
+  function showSamples() { setResultEntry({ view: "dashboard", revision: Date.now() }); setSampleListOpen(true); }
   function navigate(next: string) {
     const url = new URL(location.href);
     url.hash = next.startsWith("tool:") ? "tools/" + next.slice(5) : "";
@@ -653,7 +677,7 @@ export default function App() {
         setSheets: setPendingSheets,
       }}
     >
-      <div className="app-shell">
+      <div className={"app-shell refreshed-site " + (route === "home" ? "home-page" : "work-page")}>
         <a
           className="skip-link"
           href="#main"
@@ -678,6 +702,8 @@ export default function App() {
               HRBIP<small>HR Business Intelligence Partner</small>
             </span>
           </button>
+          <SiteNavigation onStart={beginInput} onSample={showSamples} onSaved={loadSaved}
+            onTool={id => navigate("tool:" + id)} onResult={view => openResult(view)} onRequest={() => setRequestOpen(true)} />
           <div className="account-nav">
             {user ? (
               <Button onClick={() => setAccountOpen(true)}>
@@ -695,83 +721,8 @@ export default function App() {
           </div>
         </header>
         <div className="workspace">
-          <aside className="sidebar">
-            <div className="sidebar-label">WORKSPACE</div>
-            <nav className="workspace-nav" aria-label="워크스페이스">
-              <button
-                className={route === "home" ? "selected" : ""}
-                onClick={() => navigate("home")}
-              >
-                <Grid2X2 size={19} />
-                모든 도구
-              </button>
-              <button
-                className={
-                  ["input", "repeat", "verify", "result"].includes(route)
-                    ? "selected"
-                    : ""
-                }
-                onClick={() =>
-                  ["input", "repeat", "verify"].includes(route)
-                    ? navigate(route)
-                    : w.datasets.length && !shared
-                      ? navigate("result")
-                      : start()
-                }
-              >
-                <BarChart3 size={19} />
-                대시보드 자동화
-              </button>
-              {
-                <button
-                  className={route === "saved" ? "selected" : ""}
-                  onClick={loadSaved}
-                >
-                  <FolderOpen size={19} />
-                  저장한 작업
-                </button>
-              }
-            </nav>
-            <div className="sidebar-label quick-nav-label">
-              추가 업무 지원 도구
-            </div>
-            <nav
-              className="workspace-nav quick-nav"
-              aria-label="추가 업무 지원 도구"
-            >
-              {supportTools.map(({ id, short, icon: Icon }) => (
-                <button
-                  key={id}
-                  className={activeTool?.id === id ? "selected" : ""}
-                  aria-current={activeTool?.id === id ? "page" : undefined}
-                  onClick={() => navigate("tool:" + id)}
-                >
-                  <Icon size={19} aria-hidden="true" />
-                  {short}
-                </button>
-              ))}
-            </nav>
-            <div className="sidebar-bottom">
-              <span className="round-icon">
-                <Leaf size={20} />
-              </span>
-              <strong>
-                반복은 줄이고,
-                <br />
-                사람에게 집중하세요.
-              </strong>
-              <p>
-                인사 업무를 위한
-                <br />
-                작은 도구부터 함께.
-              </p>
-              <button onClick={() => setRequestOpen(true)}>
-                기능 제안하기 <ArrowUpRight size={16} />
-              </button>
-            </div>
-          </aside>
           <main id="main" tabIndex={-1}>
-            <div className="breadcrumb">
+            {route !== "home" && <div className="breadcrumb">
               워크스페이스 <ChevronRight size={13} />{" "}
               {route === "home"
                 ? "모든 도구"
@@ -782,8 +733,8 @@ export default function App() {
                     : shared
                       ? "공유 보고서"
                       : "인사현황 보고서·대시보드"}
-            </div>
-            {guestMode && !activeTool ? (
+            </div>}
+            {route !== "home" && guestMode && !activeTool ? (
               <Notice>
                 로그인 없이 내 파일 또는 샘플로 시작하세요. 작업과 회사 양식은
                 이 브라우저에 자동 저장돼요. 새로고침하거나 다시 방문해도
@@ -793,6 +744,7 @@ export default function App() {
                   " 로그인 후 ‘계정에 저장’을 누르면 온라인에도 보관할 수 있어요. 기존 작업을 자동 업로드하지 않아요."}
               </Notice>
             ) : (
+              route !== "home" &&
               publicDemo &&
               !guestMode &&
               !activeTool && (
@@ -833,179 +785,8 @@ export default function App() {
                 작업을 처리하고 있어요…
               </div>
             )}
-            {route === "home" && (
-              <>
-                <section className="home-intro">
-                  <div>
-                    <div className="eyebrow">
-                      <span className="tiny-dot" />
-                      YOUR HR WORK PARTNER
-                    </div>
-                    <h1 className="hero-brand">HRBIP</h1>
-                    <div className="hero-brand-name">
-                      HR Business Intelligence Partner
-                    </div>
-                    <h2 className="hero-message">
-                      기존 인사 자료에서,
-                      <br />
-                      대시보드와 보고서까지.
-                    </h2>
-                    <p>
-                      인사 시스템에서 내려받은 파일과 엑셀을 연결하세요.
-                      <br />
-                      숫자의 기준을 확인하고, 차트와 문서를 편집해 보고에
-                      활용하세요.
-                    </p>
-                    <div className="hero-actions">
-                      <Button variant="primary" onClick={() => start()}>
-                        대시보드 만들기 <ArrowRight size={22} />
-                      </Button>
-                      <Button onClick={() => setSampleListOpen(true)}>
-                        샘플로 먼저 보기
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="intro-illustration" aria-hidden="true">
-                    <div className="paper back" />
-                    <div className="paper front">
-                      <div className="illus-label">
-                        <span>PEOPLE INSIGHTS</span>
-                        <BarChart3 size={18} />
-                      </div>
-                      <div className="illus-title">
-                        우리 조직을 이해하는
-                        <br />더 명확한 시선.
-                      </div>
-                      <div className="illus-bars">
-                        {[40, 65, 52, 86, 72, 96].map((n, i) => (
-                          <i key={i} style={{ height: n + "%" }} />
-                        ))}
-                      </div>
-                      <span className="illus-footer">
-                        DATA → INSIGHT → ACTION
-                      </span>
-                    </div>
-                    <div className="floating-badge">
-                      <CheckCircle />
-                      자료에서 보고서까지
-                    </div>
-                  </div>
-                </section>
-                <section className="tools-heading">
-                  <div>
-                    <span className="eyebrow">TOOLS FOR YOUR WORK</span>
-                    <h2>대표 도구 · 대시보드 자동화</h2>
-                  </div>
-                  <span className="count-pill">
-                    전체 도구 {supportTools.length + 1}
-                  </span>
-                </section>
-                <div className="home-tools">
-                  <article className="featured-tool">
-                    <div className="tool-top">
-                      <span className="tool-icon">
-                        <BarChart3 size={26} />
-                      </span>
-                      <span className="tag">대표 기능</span>
-                    </div>
-                    <h2>
-                      인사 대시보드·
-                      <br />
-                      보고서 자동화
-                    </h2>
-                    <p>
-                      기존 인사 파일을 연결하면, 보유한 자료에 맞춰
-                      <br className="desktop-only" />
-                      추천 대시보드와 수정 가능한 보고서 초안을 만들어요.
-                    </p>
-                    <div className="feature-chips">
-                      <span>인원·입퇴사</span>
-                      <span>근태·휴가</span>
-                      <span>인건비</span>
-                    </div>
-                    <div className="tool-actions">
-                      <Button variant="primary" onClick={() => start()}>
-                        내 자료로 시작하기 <ArrowRight size={18} />
-                      </Button>
-                      <Button onClick={() => start(true, "result")}>
-                        <FlaskConical size={17} />
-                        샘플로 체험하기
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => setSampleListOpen(true)}
-                      >
-                        샘플 목록
-                      </Button>
-                    </div>
-                    <div className="tool-foot">
-                      <ShieldCheck size={15} />
-                      원본을 보호하고, 확인한 기준으로 집계해요.
-                    </div>
-                  </article>
-                  <div className="stack">
-                    <article className="panel how-to">
-                      <h3>복잡한 설정 없이, 한 단계씩.</h3>
-                      {[
-                        [
-                          "01",
-                          "입력 · 기존 자료를 연결해요",
-                          "필요한 항목과 파일 구조를 먼저 확인하고 CSV·Excel을 가져오세요.",
-                        ],
-                        [
-                          "02",
-                          "확인 · 숫자의 근거를 검토해요",
-                          "누락·중복·기간과 계산 기준을 확인해요. 없는 자료는 추정하지 않아요.",
-                        ],
-                        [
-                          "03",
-                          "출력 · 보고할 자료를 완성해요",
-                          guestMode
-                            ? "문장과 차트를 미리 보고 PDF·PPT·Excel로 내려받으세요. 작업과 수정 내용은 이 브라우저에 자동 저장돼요."
-                            : "문장과 차트를 미리 보고 PDF·PPT·Excel로 출력하세요. 다음 보고는 저장한 설정으로 시작해요.",
-                        ],
-                      ].map(([n, t, d]) => (
-                        <div className="how-step" key={n}>
-                          <span>{n}</span>
-                          <div>
-                            <strong>{t}</strong>
-                            <p>{d}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </article>
-                    <article className="coming-soon">
-                      <div>
-                        <span className="tag muted-tag">확장 예정</span>
-                        <h3>다음 도구는, 실제 필요에서.</h3>
-                        <p>반복해서 하는 인사 업무가 있나요?</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        aria-label="원하는 기능 요청"
-                        onClick={() => setRequestOpen(true)}
-                      >
-                        <Plus size={23} />
-                      </Button>
-                    </article>
-                  </div>
-                </div>
-                <SupportToolCards onOpen={(id) => navigate("tool:" + id)} />
-                <section className="request-banner">
-                  <MessageSquarePlus size={26} />
-                  <div>
-                    <h3>“이런 기능도 있으면 좋겠어요.”</h3>
-                    <p>
-                      원하는 기능이 있으면 요청해보세요. 다음 개선의 출발점이
-                      돼요.
-                    </p>
-                  </div>
-                  <Button onClick={() => setRequestOpen(true)}>
-                    기능 요청하기 <ArrowUpRight size={16} />
-                  </Button>
-                </section>
-              </>
-            )}
+            {route === "home" && <HomePage onStart={beginInput} onSample={showSamples}
+              onResult={openResult} onTool={id => navigate("tool:" + id)} />}
             {activeTool && (
               <SupportToolPage
                 key={activeTool.id}
@@ -1071,6 +852,7 @@ export default function App() {
                   </div>
                 )}
                 <Results
+                  entry={resultEntry}
                   loggedIn={!!user}
                   accountsEnabled={accountsEnabled}
                   onLogin={() => setAuthOpen(true)}
@@ -1720,69 +1502,8 @@ function AuthModal({
   );
 }
 function RequestModal({ onClose }: { onClose: () => void }) {
-  const guest = useGuest();
-  const [message, setMessage] = useState(""),
-    [status, setStatus] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  if (guest.enabled)
-    return (
-      <Modal title="기능 제안하기" onClose={onClose}>
-        <p>어떤 상황에서 어떤 기능이 필요한지 GitHub 이슈에 남길 수 있어요.</p>
-        <p>
-          외부 GitHub 사이트에서 직접 작성·제출하며 GitHub 로그인이 필요해요.
-          이슈는 공개되므로 개인정보나 회사 자료는 올리지 마세요.
-        </p>
-        <a
-          className="button primary"
-          href="https://github.com/yangrin327-tech/HRBIP/issues/new"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          GitHub에서 제안 작성하기 ↗
-        </a>
-      </Modal>
-    );
-  return (
-    <Modal title="어떤 업무를 더 도와드릴까요?" onClose={onClose}>
-      <p>반복해서 만드는 자료나 불편한 업무를 알려주세요.</p>
-      <label>
-        원하는 기능
-        <textarea
-          rows={6}
-          minLength={5}
-          maxLength={2000}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="어떤 상황에서, 무엇이 불편한지 적어주세요. 개인정보는 넣지 마세요."
-        />
-      </label>
-      <small>
-        현재 접속한 HRBIP 서버의 기능 요청함에 저장해요. 개인정보는 적지 말아
-        주세요.
-      </small>
-      {status && <Notice tone="success">{status}</Notice>}
-      {error && <Notice tone="error">{error}</Notice>}
-      <Button
-        variant="primary"
-        busy={busy}
-        disabled={message.trim().length < 5}
-        onClick={async () => {
-          setBusy(true);
-          setError("");
-          try {
-            const data = await api("/requests", "POST", { message });
-            setStatus(data.message + " 요청 번호: " + data.id.slice(0, 8));
-            setMessage("");
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        기능 요청 저장
-      </Button>
-    </Modal>
-  );
+  return <Modal title="문의·기능 제안" onClose={onClose}>
+    <p>궁금한 점이나 필요한 기능을 이곳에 바로 남겨주세요.</p>
+    <InquiryForm />
+  </Modal>;
 }

@@ -1,0 +1,33 @@
+.support-output .support-review-reason {
+  padding: 14px 18px;
+  border-left: 4px solid var(--green);
+  background: var(--paper);
+  line-height: 1.8;
+}
+.support-output .support-review-suggestion {
+  padding: 18px;
+  margin: 20px 0;
+  border: 1px dashed var(--green);
+  border-radius: 12px;
+  background: var(--paper);
+  overflow-wrap: anywhere;
+}
+.support-output .support-review-suggestion > p {
+  margin: 12px 0;
+  white-space: pre-wrap;
+}
+.support-output .support-review-suggestion > small {
+  display: block;
+  line-height: 1.7;
+}
+.support-review-steps {
+  margin: 24px 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.support-review-steps li {
+  padding: 8px 0;
+  line-height: 1.8;
+}

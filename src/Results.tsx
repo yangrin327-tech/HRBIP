@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ResultView } from "./SiteNavigation";
 import {
   Save,
   Download,
@@ -31,6 +32,7 @@ import { CalculationVerification } from "./CalculationVerification";
 import { useGuest } from "./guest";
 import { UsageGuide } from "./UsageGuide";
 export function Results({
+  entry,
   w,
   r,
   setW,
@@ -48,6 +50,7 @@ export function Results({
   onLogin = () => {},
   sharedId,
 }: {
+  entry?: { view: ResultView; revision: number };
   w: Workspace;
   r: Result;
   setW: (fn: (v: Workspace) => void) => void;
@@ -79,6 +82,12 @@ export function Results({
   const cards = effectiveCards(w, r),
     stale = w.report.basisKey !== r.key,
     reviewed = w.report.reviewedKey === r.key && !stale;
+  useEffect(() => {
+    if (!entry) return;
+    setTab(entry.view === "report" ? "report" : "dashboard");
+    setCompanyOpen(entry.view === "company" && !readOnly);
+    setVerificationOpen(entry.view === "verification");
+  }, [entry, readOnly]);
   const changeCard = (id: string, fn: (c: Card) => void) =>
     setW((v) => {
       v.design.cards = effectiveCards(v, r);
