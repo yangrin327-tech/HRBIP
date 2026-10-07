@@ -52,7 +52,10 @@ test("list results and CSV reflect pasted values, duplicates, edits and local st
     if (req.method() === "POST") sent.push(req.url());
   });
   await page.goto("/#tools/lists");
+  const skipLink = page.getByRole("link", { name: "본문으로 건너뛰기" });
+  await expect(skipLink).toBeAttached();
   await page.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main")).toBeFocused();
   await expect(page).toHaveURL(/#tools\/lists$/);
