@@ -15,6 +15,7 @@ import {
   type Original,
 } from "./files";
 import { Button, Notice, PageTitle, Steps } from "./ui";
+import { UsageGuide } from "./UsageGuide";
 import { SheetSetup } from "./SheetSetup";
 import { recognizeHrWorkbook, prepareHrWorkbook } from "./hr-workbook";
 import { useGuest } from "./guest";
@@ -138,6 +139,7 @@ export function DataInput({
         description="쓰고 있는 파일을 그대로 가져오세요. 필요한 항목은 다음 단계에서 연결해요."
       />
       <Steps current={0} />
+      <UsageGuide kind="input" />
       {repeating && (
         <Notice>
           새 자료로 반복 보고 중이에요. 이번 보고에 필요한 파일을 올려주세요.

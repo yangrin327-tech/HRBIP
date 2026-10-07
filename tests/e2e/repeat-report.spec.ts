@@ -20,7 +20,7 @@ test("repeat saved report with renamed columns uses only new rows and exports pr
   await page
     .getByLabel("담당자 설명·의견", { exact: true })
     .fill("이전 달 전용 의견");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
   const initial = await (await page.request.get("/api/works")).json();
   const old = await (
@@ -107,22 +107,26 @@ test("repeat saved report with renamed columns uses only new rows and exports pr
   expect(content).toContain("이번 달에 확인한 설명");
   expect(content).not.toContain("이전 달 전용 의견");
   const all = await (await page.request.get("/api/works")).json();
-  expect(all).toHaveLength(2);
+  expect(all).toHaveLength(1); // Download alone does not upload the new work.
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "닫기", exact: true })
+    .click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
+  await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
+  const savedWorks = await (await page.request.get("/api/works")).json();
+  expect(savedWorks).toHaveLength(2);
   const oldAfter = await (
     await page.request.get("/api/works/" + initial[0].id)
   ).json();
   expect(oldAfter.workspace).toEqual(old.workspace);
-  const fresh = all.find((x: any) => x.id !== initial[0].id);
+  const fresh = savedWorks.find((x: any) => x.id !== initial[0].id);
   const restored = await (
     await page.request.get("/api/works/" + fresh.id)
   ).json();
   expect(restored.workspace.datasets).toHaveLength(1);
   expect(restored.workspace.datasets[0].rows).toHaveLength(2);
   expect(JSON.stringify(restored.workspace.datasets)).not.toContain("E001");
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "닫기", exact: true })
-    .click();
   await page.reload();
   await page
     .getByRole("navigation", { name: "워크스페이스" })

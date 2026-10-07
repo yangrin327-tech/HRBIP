@@ -110,7 +110,9 @@ test("save failure and expired session preserve the edited report", async ({
   await page
     .getByLabel("담당자 설명·의견")
     .fill("실패해도 남아 있어야 하는 문장");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page
+    .getByRole("button", { name: "로그인하고 계정에 저장", exact: true })
+    .click();
   await page.getByRole("button", { name: "처음이신가요? 계정 만들기" }).click();
   await page.getByLabel("아이디", { exact: true }).fill("failure" + Date.now());
   await page
@@ -125,7 +127,7 @@ test("save failure and expired session preserve the edited report", async ({
       body: JSON.stringify({ error: "테스트 저장 실패. 다시 시도하세요." }),
     }),
   );
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("저장 실패");
   await expect(page.getByLabel("담당자 설명·의견")).toHaveValue(
     "실패해도 남아 있어야 하는 문장",
@@ -138,7 +140,7 @@ test("save failure and expired session preserve the edited report", async ({
       body: JSON.stringify({ error: "로그인 만료" }),
     }),
   );
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).last().click();
   await expect(page.getByLabel("담당자 설명·의견")).toHaveValue(
@@ -170,10 +172,10 @@ test("guest sample, report editing, linked filters, chart editor and PDF downloa
     page.getByRole("heading", { name: "2026년 3분기 인사현황", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".save-state")).toContainText(
-    "아직 저장하지 않은 작업",
+    "이 브라우저에 자동 저장했어요",
   );
   await expect(page.locator(".save-state")).toContainText(
-    "파일 다운로드만으로는 작업 목록에 남지 않아요",
+    "‘저장한 작업’에서 다시 열 수 있어요",
   );
   await page.screenshot({ path: "artifacts/verification/HRBIP-dashboard.png" });
   const departmentCard = page.locator(".chart-card").filter({
@@ -314,7 +316,9 @@ test("real registration, save/reopen, template reuse without old data, feature r
   await page
     .getByRole("button", { name: "샘플로 체험하기", exact: true })
     .click();
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page
+    .getByRole("button", { name: "로그인하고 계정에 저장", exact: true })
+    .click();
   await page.getByRole("button", { name: "처음이신가요? 계정 만들기" }).click();
   await page.getByLabel("아이디", { exact: true }).fill(username);
   await page
@@ -324,7 +328,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("tab", { name: "보고서", exact: true }).click();
   await page.getByLabel("담당자 설명·의견").fill("다시 열기 검증용 의견");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "저장했어요" }),
   ).toBeVisible();
@@ -348,7 +352,7 @@ test("real registration, save/reopen, template reuse without old data, feature r
   await expect(page.locator(".save-state")).toContainText(
     "저장 후 변경사항이 있어요",
   );
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await expect(page.locator(".save-state")).toContainText("저장한 작업이에요");
   await page
     .getByRole("navigation", { name: "워크스페이스" })
@@ -420,6 +424,9 @@ test("workspace navigation stays available on mobile and login returns to saved 
   }
   await workspace
     .getByRole("button", { name: "저장한 작업", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "로그인하고 계정 작업 보기", exact: true })
     .click();
   await page.getByLabel("아이디", { exact: true }).fill(username);
   await page.getByLabel("비밀번호", { exact: true }).fill(password);

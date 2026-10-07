@@ -11,6 +11,7 @@ import {
 import { api } from "./api";
 import { Button, Modal, Notice } from "./ui";
 import { useGuest, type GuestFormat } from "./guest";
+import { UsageGuide } from "./UsageGuide";
 export function CompanyFormats({
   w,
   r,
@@ -39,7 +40,9 @@ export function CompanyFormats({
     [message, setMessage] = useState(""),
     [brand, setBrand] = useState({ font: "맑은 고딕", color: "#166b4c" });
   const refresh = () =>
-    api<CompanyFormat[]>("/company-formats").then(setFormats);
+    api<CompanyFormat[]>("/company-formats").then((cloud) =>
+      setFormats([...cloud, ...guest.formats.map((f) => f.meta)]),
+    );
   useEffect(() => {
     if (guest.enabled) setFormats(guest.formats.map((f) => f.meta));
     else if (loggedIn) void refresh().catch((e) => setError(e.message));
@@ -77,6 +80,7 @@ export function CompanyFormats({
   };
   return (
     <Modal title="회사 양식 등록·적용" onClose={onClose} wide>
+      <UsageGuide kind="formats" />
       <p>
         {guest.enabled
           ? "PPTX·Excel 양식을 연결하고 현재 보고서에 적용하세요. 양식과 연결은 이 브라우저에 저장하고 다음 보고에도 재사용해요. 검사·출력은 서버에서 일회성으로 처리하며 서버에 파일을 보관하지 않아요."
@@ -155,7 +159,7 @@ export function CompanyFormats({
                       )
                     )
                       return;
-                    if (guest.enabled)
+                    if (guest.formats.some((v) => v.meta.id === f.id))
                       await guest.setFormats(
                         guest.formats.filter((v) => v.meta.id !== f.id),
                       );
@@ -446,7 +450,11 @@ export function CompanyFormats({
                     bindings,
                     brand,
                     confirmed,
-                    previousId: previousId || undefined,
+                    previousId: guest.formats.some(
+                      (f) => f.meta.id === previousId,
+                    )
+                      ? undefined
+                      : previousId || undefined,
                   },
                 );
                 await refresh();

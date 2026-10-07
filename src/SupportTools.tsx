@@ -10,6 +10,14 @@ import {
   Download,
 } from "lucide-react";
 import { Button, Notice, PageTitle } from "./ui";
+import { UsageGuide } from "./UsageGuide";
+import {
+  lawExample,
+  settlementExample,
+  leaveExample,
+  contractExample,
+  recruitmentExample,
+} from "../shared/support-samples";
 import { parseFile, type RawSheet } from "./files";
 import {
   lawGuide,
@@ -77,41 +85,6 @@ export const supportTools = [
 export type SupportToolId = (typeof supportTools)[number]["id"];
 export const toolFromHash = () =>
   supportTools.find((t) => location.hash === "#tools/" + t.id)?.id;
-const lawExample: LawInput = {
-  question:
-    "직원이 10월 20일까지만 일하겠다고 합니다. 다음 급여일인 11월 10일에 퇴사 정산도 같이 해도 되나요?",
-  topic: "payment",
-  eventDate: "2026-10-20",
-  agreement: "unknown",
-  endMeaning: "last",
-};
-const lineExamples: SettlementLine[] = [
-  { name: "최종 월 급여", kind: "pay", value: "1800000", note: "" },
-  { name: "연장근로수당", kind: "pay", value: "120000", note: "" },
-  { name: "미사용 연차수당", kind: "pay", value: "300000", note: "" },
-  { name: "공제 합계", kind: "deduction", value: "90000", note: "" },
-];
-const leaveExample: LeaveInput = {
-  mode: "comparison",
-  start: "2024-07-01",
-  end: "2026-09-30",
-  eligible: true,
-  complete: true,
-  monthly: true,
-  prorataMonths: "6",
-  granted: "15",
-  carried: "0",
-  used: "7.5",
-  expired: "0",
-  adjustment: "0",
-  stated: "6.5",
-  companyRule:
-    "회계연도 1월 1일 부여, 첫해 비례분은 재직 개월 기준, 월별 개근분은 별도. 비교 범위는 입사~퇴사 누적 부여량.",
-};
-const contractExample =
-  "제3조 임금: 월 300만원. 연장근로수당을 포함한다.\n제4조 근무: 월~금 09:00~18:00.\n제5조 휴게: 회사 운영에 따른다.\n제6조 휴일·연차: 회사 규정에 따른다.";
-const recruitmentExample =
-  "상단 고용형태: 정규직\n상단 근무지: 서울 강남\n본문 고용형태: 6개월 계약직 후 정규직 전환 검토\n본문 근무지: 판교 사무실\n수습 3개월\n전형: 서류 → 면접";
 function useDraft(id: SupportToolId) {
   const key = "hrbip.support-tools.v1." + id;
   const [initial] = useState(() => {
@@ -554,12 +527,7 @@ export function SupportToolPage({
   }
   function sample() {
     if (id === "law") update({ ...lawExample });
-    else if (id === "settlement")
-      update({
-        lines: lineExamples,
-        claimed: "2030000",
-        scope: "2026년 10월 최종 급여 정산 · 퇴직급여 별도",
-      });
+    else if (id === "settlement") update({ ...settlementExample });
     else if (id === "leave") update({ ...leaveExample });
     else
       update({
@@ -907,6 +875,7 @@ export function SupportToolPage({
           </Button>
         }
       />
+      <UsageGuide kind={id} />
       <div className="support-privacy">
         <label className="quick-checkbox">
           <input

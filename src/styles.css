@@ -2822,3 +2822,58 @@ details[open] > summary::before {
     flex-direction: column;
   }
 }
+
+/* First-use instructions share the same hierarchy across all tools. */
+.usage-guide {
+  margin: 20px 0;
+  padding: 22px 24px;
+  border: 1px solid #dce8df;
+  border-radius: 16px;
+  background: #f5f9f5;
+}
+.usage-guide h2 {
+  font-size: 18px;
+  margin: 0 0 14px;
+  color: #175a43;
+}
+.usage-guide ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.usage-guide li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.usage-guide li > span {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #dceece;
+  color: #185b42;
+  font-weight: 700;
+}
+.usage-guide p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #344d40;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 850px) {
+  .usage-guide ol {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .usage-guide {
+    padding: 18px;
+  }
+}

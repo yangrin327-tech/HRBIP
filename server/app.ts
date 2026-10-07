@@ -145,7 +145,7 @@ export function createApp(
     next();
   });
   streamLargeResponses(app);
-  const guestMode = !!options.guestMode || !!options.publicDemo;
+  const guestMode = options.guestMode ?? !!options.publicDemo;
   if (guestMode) {
     const routes = new Set([
       "GET /health",
@@ -352,13 +352,15 @@ export function createApp(
       publicDemo: !!options.publicDemo,
     }),
   );
-  app.get("/api/me", async (req, res) =>
+  app.get("/api/me", async (req, res) => {
+    const user = guestMode ? null : await currentUser(db, req);
     res.json({
-      user: guestMode ? null : await currentUser(db, req),
-      guestMode,
+      user,
+      guestMode: guestMode || !user,
+      accountsEnabled: !guestMode,
       publicDemo: !!options.publicDemo,
-    }),
-  );
+    });
+  });
   const authLimit = rateLimit({
     windowMs: 15 * 60000,
     limit: 40,
@@ -706,7 +708,7 @@ export function createApp(
       const formatId = w.companyFormats?.[format as "pptx" | "xlsx"];
       let file: Buffer, appliedMeta: CompanyFormat | undefined;
       if (formatId) {
-        if (!owner && !guestMode)
+        if (!owner && !guestFormat && !guestMode)
           throw new HttpError(
             401,
             "회사 양식 내보내기는 로그인 후 이용하세요.",
@@ -716,7 +718,7 @@ export function createApp(
             422,
             "현재 탭에 회사 양식이 없습니다. 양식을 다시 선택하거나 HRBIP 기본 양식을 사용하세요.",
           );
-        const saved = guestMode
+        const saved = guestFormat
           ? await prepareGuestFormat(guestFormat)
           : await getFormat(formatId, owner!);
         if (saved.meta.format !== format)
@@ -758,7 +760,7 @@ export function createApp(
       w,
       guestMode ? undefined : (await currentUser(db, req))?.id,
       false,
-      guestMode ? req.body.companyFormat : undefined,
+      req.body.companyFormat,
     );
   });
   app.post("/api/works/:id/export/:format", exportLimit, async (req, res) => {

@@ -70,14 +70,18 @@ test("all five examples produce checkable results with no input API requests; mo
   });
   for (const id of ids) {
     await example(page, id);
+    await expect(output(page).locator(".status-difference")).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "이렇게 사용하세요", exact: true }),
+    ).toBeVisible();
     if (id === "law") await expect(output(page)).toContainText("14일");
     if (id === "settlement")
       await expect(output(page)).toContainText("2,130,000원");
-    if (id === "leave") await expect(output(page)).toContainText("33.5일");
+    if (id === "leave") await expect(output(page)).toContainText("57일");
     if (id === "contract")
-      await expect(output(page)).toContainText("수당 포함 조건");
+      await expect(output(page)).toContainText("0개 확인 항목");
     if (id === "recruitment")
-      await expect(output(page)).toContainText("고용형태 불일치");
+      await expect(output(page)).toContainText("게시 전 확인할 0개 항목");
     await page
       .getByLabel("담당자 확인·의견", { exact: true })
       .fill("담당자 확인 기록");
@@ -92,8 +96,12 @@ test("all five examples produce checkable results with no input API requests; mo
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    for (const finding of await output(page).locator('.support-finding').all()) {
-      const width=await finding.locator('.support-evidence').evaluate(e=>e.getBoundingClientRect().width);
+    for (const finding of await output(page)
+      .locator(".support-finding")
+      .all()) {
+      const width = await finding
+        .locator(".support-evidence")
+        .evaluate((e) => e.getBoundingClientRect().width);
       expect(width).toBeGreaterThan(220); // A status class must not inherit the checkbox row.
     }
     await page.screenshot({
@@ -273,7 +281,7 @@ test("opt-in storage restores inputs/opinions; corrupt or blocked storage is exp
     .fill("연차대장 별도 확인");
   await page.reload();
   await expect(page.getByLabel("입사일", { exact: true })).toHaveValue(
-    "2024-07-01",
+    "2023-01-01",
   );
   await page.getByRole("button", { name: "입력 자료 점검하기" }).click();
   await expect(

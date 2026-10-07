@@ -5,7 +5,7 @@ import { serverConfig } from "../server/config";
 import { createApp } from "../server/app";
 import { openStore } from "../server/store";
 
-test("public hosting enforces HTTPS and always uses guest mode without storage", () => {
+test("public hosting enforces HTTPS and account storage requires explicit opt-in", () => {
   assert.equal(serverConfig({}).host, "127.0.0.1");
   assert.throws(() => serverConfig({ PUBLIC_DEMO: "true" }), /HTTPS/);
   const publicEnv = {
@@ -15,8 +15,26 @@ test("public hosting enforces HTTPS and always uses guest mode without storage",
   };
   assert.equal(serverConfig(publicEnv).guestMode, true);
   assert.equal(
-    serverConfig({ ...publicEnv, HRBIP_ACCOUNTS_ENABLED: "true" }).guestMode,
-    true,
+    serverConfig({
+      ...publicEnv,
+      DATA_DIR: "/data",
+      HRBIP_ACCOUNTS_ENABLED: "true",
+    }).guestMode,
+    false,
+  );
+  assert.throws(
+    () => serverConfig({ ...publicEnv, HRBIP_ACCOUNTS_ENABLED: "true" }),
+    /persistent/,
+  );
+  assert.throws(
+    () =>
+      serverConfig({
+        ...publicEnv,
+        DATA_DIR: "/tmp",
+        VERCEL: "1",
+        HRBIP_ACCOUNTS_ENABLED: "true",
+      }),
+    /DATABASE_URL/,
   );
   assert.equal(
     serverConfig({ HRBIP_ACCOUNTS_ENABLED: "true" }).guestMode,

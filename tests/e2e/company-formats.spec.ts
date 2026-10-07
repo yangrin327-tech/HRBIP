@@ -33,16 +33,14 @@ test("register PPT and Excel formats, persist/reopen, verify and export company 
       h: 3.5,
       fontSize: 16,
     });
-  await modal
-    .getByLabel("회사 양식 파일", { exact: true })
-    .setInputFiles({
-      name: "테스트회사.pptx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      buffer: Buffer.from(
-        (await ppt.write({ outputType: "nodebuffer" })) as Buffer,
-      ),
-    });
+  await modal.getByLabel("회사 양식 파일", { exact: true }).setInputFiles({
+    name: "테스트회사.pptx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    buffer: Buffer.from(
+      (await ppt.write({ outputType: "nodebuffer" })) as Buffer,
+    ),
+  });
   await expect(modal.getByLabel("양식 이름", { exact: true })).toHaveValue(
     "테스트회사",
   );
@@ -61,14 +59,12 @@ test("register PPT and Excel formats, persist/reopen, verify and export company 
   sheet.getCell("B4").value = "{{metric:headcount}}";
   sheet.getCell("B6").value = "{{table:metrics}}";
   sheet.getColumn("B").width = 40;
-  await modal
-    .getByLabel("회사 양식 파일", { exact: true })
-    .setInputFiles({
-      name: "테스트회사.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer: Buffer.from(await excel.xlsx.writeBuffer()),
-    });
+  await modal.getByLabel("회사 양식 파일", { exact: true }).setInputFiles({
+    name: "테스트회사.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from(await excel.xlsx.writeBuffer()),
+  });
   await modal
     .getByLabel(
       "연결과 고정 문구·그림을 확인했어요. 과거 수치나 개인정보가 남아 있지 않아요.",
@@ -132,6 +128,7 @@ test("register PPT and Excel formats, persist/reopen, verify and export company 
     .getByRole("dialog", { name: "최종 확인·내보내기" })
     .getByRole("button", { name: "닫기", exact: true })
     .click();
+  await page.getByRole("button", { name: "계정에 저장", exact: true }).click();
   await page
     .getByRole("navigation", { name: "워크스페이스" })
     .getByRole("button", { name: "저장한 작업", exact: true })

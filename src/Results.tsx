@@ -29,6 +29,7 @@ import { ExportPreview } from "./ExportPreview";
 import { CompanyFormats } from "./CompanyFormats";
 import { CalculationVerification } from "./CalculationVerification";
 import { useGuest } from "./guest";
+import { UsageGuide } from "./UsageGuide";
 export function Results({
   w,
   r,
@@ -43,6 +44,7 @@ export function Results({
   readOnly = false,
   busy = false,
   loggedIn = false,
+  accountsEnabled = false,
   onLogin = () => {},
   sharedId,
 }: {
@@ -59,6 +61,7 @@ export function Results({
   readOnly?: boolean;
   busy?: boolean;
   loggedIn?: boolean;
+  accountsEnabled?: boolean;
   onLogin?: () => void;
   sharedId?: string;
 }) {
@@ -125,8 +128,11 @@ export function Results({
               <>
                 <Button busy={busy} onClick={onSave}>
                   <Save size={17} />
-                  저장
+                  {guest.enabled ? "이 브라우저에 저장" : "계정에 저장"}
                 </Button>
+                {guest.enabled && accountsEnabled && (
+                  <Button onClick={onLogin}>로그인하고 계정에 저장</Button>
+                )}
                 {!guest.enabled && (
                   <Button onClick={onShare}>
                     <Share2 size={17} />
@@ -143,6 +149,7 @@ export function Results({
         }
       />
       {!readOnly && <Steps current={reviewed ? 3 : 2} />}
+      {!readOnly && <UsageGuide kind="result" />}
       <section className="report-tools" aria-label="회사 양식과 계산 검증">
         <div>
           <strong>보고를 마무리하는 두 가지 도구</strong>

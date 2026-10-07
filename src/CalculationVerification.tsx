@@ -4,6 +4,7 @@ import type { Workspace, Result } from "../shared/model";
 import type { Verification } from "../shared/verification";
 import { statusNames } from "../shared/verification";
 import { Modal, Button, Notice } from "./ui";
+import { UsageGuide } from "./UsageGuide";
 export function CalculationVerification({
   w,
   r,
@@ -41,6 +42,7 @@ export function CalculationVerification({
   }, [r.key, w.report.generated, w.report.notes, sharedId, refresh]);
   return (
     <Modal title="계산 검증 결과" onClose={onClose} wide>
+      <UsageGuide kind="verification" />
       <p>
         원자료를 별도 방식으로 다시 집계하고 지표·차트와 대조해요. 자료가 부족한
         항목은 통과로 표시하지 않아요.
@@ -54,7 +56,7 @@ export function CalculationVerification({
           <Notice tone={value.blocked ? "error" : "info"}>
             {value.blocked
               ? "계산 불일치가 있어 최종 내보내기를 중단해요."
-              : "계산 대조가 끝났어요. 아래 확인 필요·검증 불가 항목도 함께 확인하세요."}
+              : "계산 대조가 끝났어요. 불일치 0건이에요. 아래 확인 필요·검증 불가 항목도 함께 확인하세요."}
           </Notice>
           <div className="verification-counts">
             {Object.entries(value.counts).map(([key, count]) => (

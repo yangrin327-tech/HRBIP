@@ -21,9 +21,9 @@ export function serverConfig(env: NodeJS.ProcessEnv = process.env) {
       "APP_ORIGIN must be a full origin without a path or trailing slash.",
     );
   const publicDemo = env.PUBLIC_DEMO === "true";
-  // Public deployment is always account-free. Legacy local data remains available
-  // only when a developer deliberately opts in on a non-public server.
-  const guestMode = publicDemo || env.HRBIP_ACCOUNTS_ENABLED !== "true";
+  // Authentication is an explicit deployment choice, independent of the
+  // portfolio notice. Anonymous samples and exports remain available.
+  const guestMode = env.HRBIP_ACCOUNTS_ENABLED !== "true";
   if (
     publicDemo &&
     (parsed.protocol !== "https:" || env.COOKIE_SECURE !== "true")

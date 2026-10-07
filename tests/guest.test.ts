@@ -37,6 +37,7 @@ test("guest API never touches storage, blocks old sessions and supports memory-o
       user: null,
       guestMode: true,
       publicDemo: false,
+      accountsEnabled: false,
     });
     for (const [path, method] of [
       ["/auth/register", "POST"],
@@ -84,15 +85,13 @@ test("guest API never touches storage, blocks old sessions and supports memory-o
       }
     }
     const deck = new pptxgen();
-    deck
-      .addSlide()
-      .addText("{{metric:headcount}}", {
-        x: 1,
-        y: 1,
-        w: 4,
-        h: 1,
-        fontSize: 22,
-      });
+    deck.addSlide().addText("{{metric:headcount}}", {
+      x: 1,
+      y: 1,
+      w: 4,
+      h: 1,
+      fontSize: 22,
+    });
     const data = Buffer.from(
       (await deck.write({ outputType: "nodebuffer" })) as Buffer,
     ).toString("base64");

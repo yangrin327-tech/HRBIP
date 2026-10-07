@@ -84,13 +84,20 @@ export default function App() {
     [accountOpen, setAccountOpen] = useState(false),
     [requestOpen, setRequestOpen] = useState(false);
   const [sampleListOpen, setSampleListOpen] = useState(false);
+  const [browserImport, setBrowserImport] = useState<BrowserWork[] | null>(
+    null,
+  );
   const [publicDemo, setPublicDemo] = useState(false);
   const [guestMode, setGuestMode] = useState(true);
+  const [accountsEnabled, setAccountsEnabled] = useState(false);
+  const migratedFormats = useRef(new Map<string, string>());
   const [guestFormats, setGuestFormats] = useState<GuestFormat[]>([]);
   const [pendingSheets, setPendingSheets] = useState<RawSheet[]>([]);
   const [browserReady, setBrowserReady] = useState(false);
   const [storageError, setStorageError] = useState("");
   const saveSequence = useRef(0);
+  const workspaceRef = useRef(w);
+  workspaceRef.current = w;
   const [returnToSaved, setReturnToSaved] = useState(false);
   const [reusePlan, setReusePlan] = useState<ReusePlan | null>(null);
   const [workId, setWorkId] = useState(""),
@@ -125,7 +132,7 @@ export default function App() {
     [w, route, sharedResult],
   );
   useEffect(() => {
-    if (!accountReady || !guestMode) return;
+    if (!accountReady) return;
     let cancelled = false;
     (async () => {
       try {
@@ -133,6 +140,7 @@ export default function App() {
         if (cancelled) return;
         setGuestFormats(settings.formats);
         if (
+          guestMode &&
           settings.activeWork &&
           !new URLSearchParams(location.search).has("share")
         ) {
@@ -219,6 +227,7 @@ export default function App() {
       .then((data) => {
         setUser(data.user);
         setPublicDemo(!!data.publicDemo);
+        setAccountsEnabled(!!data.accountsEnabled);
         const guest = data.guestMode !== false;
         setGuestMode(guest);
         setGuestRequests(guest);
@@ -277,6 +286,10 @@ export default function App() {
       setAuthOpen(true);
   }
   function canReplace() {
+    if (busy) {
+      notify("처리 중인 작업이 끝난 뒤 이동해 주세요.");
+      return false;
+    }
     if (guestMode)
       return (
         !storageError ||
@@ -362,12 +375,12 @@ export default function App() {
     }
     await fetchSaved();
   }
-  async function fetchSaved() {
+  async function fetchSaved(browser = guestMode) {
     setBusy(true);
     setError("");
     try {
       const [a, b] = await Promise.all([
-        guestMode
+        browser
           ? listBrowserWorks().then((items) =>
               items.map((item) => ({
                 id: item.id,
@@ -380,7 +393,7 @@ export default function App() {
               })),
             )
           : api<Stored[]>("/works"),
-        guestMode ? listBrowserTemplates() : api<Template[]>("/templates"),
+        browser ? listBrowserTemplates() : api<Template[]>("/templates"),
       ]);
       setStored(a);
       setTemplates(b);
@@ -416,8 +429,23 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
+      // Upload browser formats only after the explicit account-save action.
+      const workspace = structuredClone(w);
+      for (const kind of ["pptx", "xlsx"] as const) {
+        const localId = workspace.companyFormats?.[kind];
+        const local = guestFormats.find((f) => f.meta.id === localId);
+        if (!local) continue;
+        const key = user.id + ":" + local.meta.id;
+        let id = migratedFormats.current.get(key);
+        if (!id) {
+          const format = await api("/company-formats", "POST", local.input);
+          id = format.id as string;
+          migratedFormats.current.set(key, id);
+        }
+        workspace.companyFormats![kind] = id;
+      }
       const data = await api("/works", "POST", {
-        workspace: w,
+        workspace,
         ...(!asNew && workId ? { id: workId, revision } : {}),
         ...(!workId || originals.length
           ? { originals: w.retainOriginals ? originals : [] }
@@ -425,7 +453,9 @@ export default function App() {
       });
       setWorkId(data.id);
       setRevision(data.revision);
-      setDirty(false);
+      const editedDuringSave = workspaceRef.current !== w;
+      rawSetW((current) => (current === w ? workspace : current));
+      setDirty(editedDuringSave);
       notify("작업과 편집 내용을 HRBIP에 저장했어요.");
       return data.id;
     } catch (e) {
@@ -450,6 +480,7 @@ export default function App() {
       }
       const data = await api("/works/" + item.id);
       rawSetW(data.workspace);
+      setPendingSheets([]);
       setReusePlan(null);
       setWorkId(data.id);
       setRevision(data.revision);
@@ -482,6 +513,7 @@ export default function App() {
       next.exitInclusive = data.exitInclusive;
       next.sample = data.sample;
       rawSetW(next);
+      setPendingSheets([]);
       setSharedResult(data.result);
       setSharedId(id);
       setDirty(false);
@@ -497,7 +529,7 @@ export default function App() {
     if (!accountReady) return;
     const id = new URLSearchParams(window.location.search).get("share");
     if (!id) return;
-    if (guestMode) {
+    if (!accountsEnabled) {
       setError(
         "계정 공유를 사용하지 않는 버전이에요. 이전 공유 링크의 자료는 공개하지 않습니다. 파일이나 샘플로 새 작업을 시작하세요.",
       );
@@ -507,7 +539,7 @@ export default function App() {
       setAuthOpen(true);
       setError("공유 자료는 지정된 계정으로 로그인해야 볼 수 있어요.");
     } else void openShared(id);
-  }, [accountReady, user?.id, guestMode]);
+  }, [accountReady, user?.id, accountsEnabled]);
   async function beginShare() {
     if (
       w.report.basisKey !== result.key ||
@@ -541,31 +573,17 @@ export default function App() {
       );
       return;
     }
-    if (user) {
-      const id = await save();
-      if (!id)
-        throw new Error(
-          "저장에 실패해 내보내기를 중단했어요. 저장 오류를 확인해 주세요.",
-        );
-      await download(
-        "/works/" + id + "/export/" + format,
-        {},
-        w.title + "." + format,
-      );
-    } else
-      await download(
-        "/export/" + format,
-        {
-          workspace: w,
-          companyFormat: guestMode
-            ? guestFormats.find(
-                (f) =>
-                  f.meta.id === w.companyFormats?.[format as "pptx" | "xlsx"],
-              )?.input
-            : undefined,
-        },
-        w.title + "." + format,
-      );
+    // Downloads are transient. Only account-save persists the analysis online.
+    await download(
+      "/export/" + format,
+      {
+        workspace: w,
+        companyFormat: guestFormats.find(
+          (f) => f.meta.id === w.companyFormats?.[format as "pptx" | "xlsx"],
+        )?.input,
+      },
+      w.title + "." + format,
+    );
     notify(
       format.toUpperCase() +
         " 파일을 만들었어요." +
@@ -573,7 +591,7 @@ export default function App() {
           ? " 다운로드 폴더에서 확인하세요. 작업은 이 브라우저에 자동 저장돼요."
           : !user
             ? " 작업 목록에 남기려면 로그인 후 저장해 주세요."
-            : " 작업도 저장했어요."),
+            : " 온라인 보관은 ‘계정에 저장’을 눌러 주세요."),
     );
   }
   function createResult() {
@@ -601,6 +619,9 @@ export default function App() {
     try {
       await api("/auth/logout", "POST", {});
       setUser(null);
+      setGuestMode(true);
+      setGuestRequests(true);
+      migratedFormats.current.clear();
       rawSetW(emptyWorkspace());
       setDirty(false);
       setWorkId("");
@@ -658,18 +679,18 @@ export default function App() {
             </span>
           </button>
           <div className="account-nav">
-            {guestMode ? (
-              <span className="muted">가입 없이 바로 사용</span>
-            ) : user ? (
+            {user ? (
               <Button onClick={() => setAccountOpen(true)}>
                 <span className="avatar">{user.username[0].toUpperCase()}</span>
                 {user.username}
               </Button>
-            ) : (
+            ) : accountsEnabled ? (
               <Button onClick={() => setAuthOpen(true)}>
                 <LogIn size={17} />
                 로그인
               </Button>
+            ) : (
+              <span className="muted">가입 없이 바로 사용</span>
             )}
           </div>
         </header>
@@ -768,6 +789,8 @@ export default function App() {
                 이 브라우저에 자동 저장돼요. 새로고침하거나 다시 방문해도
                 ‘저장한 작업’에서 이어갈 수 있어요. 다른 기기·브라우저에는
                 동기화되지 않으며, 브라우저 데이터를 지우면 삭제돼요.
+                {accountsEnabled &&
+                  " 로그인 후 ‘계정에 저장’을 누르면 온라인에도 보관할 수 있어요. 기존 작업을 자동 업로드하지 않아요."}
               </Notice>
             ) : (
               publicDemo &&
@@ -1049,6 +1072,7 @@ export default function App() {
                 )}
                 <Results
                   loggedIn={!!user}
+                  accountsEnabled={accountsEnabled}
                   onLogin={() => setAuthOpen(true)}
                   sharedId={shared ? sharedId : undefined}
                   w={w}
@@ -1093,6 +1117,37 @@ export default function App() {
                     </Button>
                   }
                 />
+                {user && (
+                  <Notice>
+                    계정에 저장한 작업은 다른 기기에서도 다시 열 수 있어요. 기존
+                    브라우저 작업은 자동 업로드하지 않아요.
+                    <Button
+                      onClick={async () => {
+                        try {
+                          setBrowserImport(await listBrowserWorks());
+                        } catch (e) {
+                          handleError(e);
+                        }
+                      }}
+                    >
+                      이 브라우저의 작업 가져오기
+                    </Button>
+                  </Notice>
+                )}
+                {!user && accountsEnabled && (
+                  <Notice>
+                    아래 목록은 이 브라우저에 저장한 작업이에요. 온라인 작업
+                    목록은 로그인 후 확인할 수 있어요.
+                    <Button
+                      onClick={() => {
+                        setReturnToSaved(true);
+                        setAuthOpen(true);
+                      }}
+                    >
+                      로그인하고 계정 작업 보기
+                    </Button>
+                  </Notice>
+                )}
                 <section className="panel">
                   <div className="section-heading">
                     <h2>
@@ -1249,7 +1304,9 @@ export default function App() {
                 <Notice>
                   {guestMode
                     ? "저장 위치: 지금 사용하는 브라우저의 IndexedDB. 이 사이트에 다시 방문하면 복원돼요. 목록에서 작업을 삭제할 수 있고, 브라우저 데이터를 지우면 이곳의 작업과 양식도 삭제돼요. 다른 기기와 자동 동기화되지 않아요."
-                    : "저장 위치: 이 프로젝트의 .data 폴더. 작업을 삭제하면 분석 자료·원본·공유 권한도 삭제돼요."}
+                    : publicDemo
+                      ? "저장 위치: HRBIP의 온라인 데이터베이스(Supabase). 로그인한 계정으로 다른 기기에서도 다시 열 수 있어요. 작업을 삭제하면 분석 자료·보관 원본·공유 권한도 삭제돼요."
+                      : "저장 위치: 이 프로젝트의 .data 폴더. 작업을 삭제하면 분석 자료·원본·공유 권한도 삭제돼요."}
                   별도로 내려받은 출력 파일은 직접 삭제하세요.
                 </Notice>
               </>
@@ -1264,7 +1321,7 @@ export default function App() {
             </footer>
           </main>
         </div>
-        {!guestMode && authOpen && (
+        {accountsEnabled && authOpen && (
           <AuthModal
             onClose={() => {
               setAuthOpen(false);
@@ -1272,14 +1329,52 @@ export default function App() {
             }}
             onSuccess={(u) => {
               setUser(u);
+              setGuestMode(false);
+              setGuestRequests(false);
+              if (guestMode) {
+                setWorkId("");
+                setRevision(0);
+                setDirty(!!w.datasets.length);
+              }
               setAuthOpen(false);
               notify("로그인했어요. 작성 중인 내용은 그대로 유지돼요.");
               if (returnToSaved) {
                 setReturnToSaved(false);
-                void fetchSaved();
+                void fetchSaved(false);
               }
             }}
           />
+        )}
+        {browserImport && (
+          <Modal
+            title="브라우저 작업 가져오기"
+            onClose={() => setBrowserImport(null)}
+          >
+            <p>
+              작업을 열어 확인한 뒤 ‘계정에 저장’을 눌러 온라인에 보관하세요.
+              선택만으로 업로드하지 않아요.
+            </p>
+            {!browserImport.length && (
+              <p>이 브라우저에 저장한 작업이 없어요.</p>
+            )}
+            <div className="stack">
+              {browserImport.map((saved) => (
+                <Button
+                  key={saved.id}
+                  onClick={() => {
+                    if (!canReplace()) return;
+                    restoreBrowserWork(saved);
+                    setWorkId("");
+                    setRevision(0);
+                    setDirty(true);
+                    setBrowserImport(null);
+                  }}
+                >
+                  {saved.workspace.title}
+                </Button>
+              ))}
+            </div>
+          </Modal>
         )}
         {!guestMode && accountOpen && user && (
           <Modal title="내 계정" onClose={() => setAccountOpen(false)}>
@@ -1543,8 +1638,14 @@ function AuthModal({
         <LockKeyhole size={26} />
       </div>
       <p>
-        로그인하면 작업·보고서·템플릿을 현재 접속한 HRBIP 서버에 저장하고 다시
-        열 수 있어요.
+        로그인하면 ‘계정에 저장’을 눌러 작업·보고서·템플릿을 온라인에 보관하고
+        다른 기기에서도 다시 열 수 있어요. 브라우저의 기존 작업은 자동으로
+        업로드하지 않아요.
+      </p>
+      <p className="small">
+        아이디와 비밀번호 해시를 계정 인증에 사용해요. 저장을 선택한 분석 자료와
+        회사 양식은 계정별로 보관해요. 포트폴리오 체험에는 가상 자료를 사용해
+        주세요.
       </p>
       <form
         onSubmit={async (e) => {
