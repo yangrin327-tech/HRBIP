@@ -476,4 +476,7 @@
 - 대시보드 입력·결과, 회사 양식, 계산 검증, 지원 도구 5개에 3단계 안내 추가. 새 기능 종류는 추가하지 않음.
 - 검증: 코드 테스트 60개 통과, 비로그인 브라우저 18개·계정 브라우저 19개 확인(수정 후 해당 실패 사례 재실행 포함). TypeScript/프로덕션 빌드/네이티브 ESM 실행 확인.
 - 기존 사용자 파일 docs/SYNTHETIC_DATA.md와 scripts/hr_data/는 수정·커밋하지 않음. DB·환경 비밀값·업로드·출력물은 Git 제외.
-- 공개 배포 검증 결과는 완료 후 별도 추가 기록.
+- 코드 a09ccdde204f89610acbbd0bb6889034eacf9f3a를 main에 push, Vercel 98UHtGJBAT7uTn8256eVaszhXgfa 성공. https://hrbip.vercel.app 에서 실제 가입/로그아웃/로그인, 계정 저장/복원, 지정 공유·필터·해제, 비로그인/다른 계정 차단, PDF/PPTX/Excel 출력의 10개 검사 통과.
+- 공개 브라우저 7/7 통과: 다섯 정상 예시(불일치 없음), CSV/XLSX/DOCX/TXT, 정상·잘못된 입력 구분, TXT/Excel 출력, 선택 입력 보관, 기존 대시보드 의견 유지, 모바일·접근성. 기존 사용자 탭에서 새 로그인 버튼·사용 안내와 정산 예시 차이 0원 확인. 새 사용자 탭은 만들지 않음.
+- 실제 공개 API 검사 첫 시도는 테스트 helper가 DELETE 본문을 생략해 415로 중단. 앱 클라이언트처럼 빈 JSON을 넣도록 helper를 수정하고 전체 10개 재실행 통과. 마지막 검사의 가상 작업 삭제/세션 종료 확인. 첫 검사의 가상 작업 1개와 테스트 계정은 private DB에 남아 있으며 실제 자료가 아니고 공개 공유되지 않음; 사용자 기존 자료는 건드리지 않음.
+- 로컬 자동 실행 서버를 새 빌드로 재시작. health ok:true, storage:local, guestMode:false 및 익명 /me accountsEnabled:true, guestMode:true 확인.

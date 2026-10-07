@@ -146,3 +146,9 @@ API 검증은 가상 테스트 계정 3개로 실행했다. 테스트 작업·�
 로컬 코드/API 58/58, 전체 공개 모드 18/18, 최종 모바일·대조표 변경 후 신규 7/7 재검증. 공개 URL에서도 신규 7/7 통과: 예시·CSV/XLSX/DOCX/TXT 입력·실제 숫자 Excel/TXT 출력·선택 보관 복원·저장/입력 오류·대표 보고서 의견/필터 유지·모바일·접근성. health `ok:true, guestMode:true, publicDemo:true, storage:none`. 검증 산출물은 `artifacts/deployment/hr-support/`이며 Git 제외다. 로컬 4173 자동 실행 서버도 최신 HTML·health를 확인했다.
 
 추가 도구의 입력·계산·출력은 브라우저에서 처리한다. 입력·의견은 보관 선택 시 같은 브라우저에 저장한다. 새 계정·서버 DB·환경변수·비용 설정 없음. 법령 안내는 공식 자료 확인일을 가진 세 쟁점의 조건 기반 방식이며 실시간 법령 API·외부 AI·법적 확정 판단은 연결하지 않았다. [지원 조건과 한계](HR_SUPPORT_TOOLS.md).
+
+## 2026-10-07 계정 기능 복원 배포
+
+기능 커밋 a09ccdde204f89610acbbd0bb6889034eacf9f3a, Vercel 98UHtGJBAT7uTn8256eVaszhXgfa 성공. 기존 Supabase 계정 저장을 다시 활성화하고 익명 체험은 유지한다. Production HRBIP_ACCOUNTS_ENABLED=true 설정; 비밀값은 읽거나 기록하지 않았다.
+
+공개 사이트에서 실제 인증·계정 저장·복원·지정 공유/해제·접근 차단·PDF/PPTX/Excel 다운로드 10개 확인, 다섯 지원 도구의 공개 브라우저 7개 시나리오 통과. 익명 /me user:null, accountsEnabled:true, guestMode:true; health storage:server, guestMode:false. 개발 검증과 실제 배포 검증을 구분하며 실무 보안/법적 운영 승인으로 간주하지 않는다.
