@@ -138,7 +138,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
 }
-.support-finding.difference {
+.support-finding.status-difference {
   border-left: 4px solid #a02e20;
 }
 .support-finding h3 {

@@ -92,6 +92,10 @@ test("all five examples produce checkable results with no input API requests; mo
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    for (const finding of await output(page).locator('.support-finding').all()) {
+      const width=await finding.locator('.support-evidence').evaluate(e=>e.getBoundingClientRect().width);
+      expect(width).toBeGreaterThan(220); // A status class must not inherit the checkbox row.
+    }
     await page.screenshot({
       path: "artifacts/verification/hr-support/" + id + "-mobile.png",
       fullPage: true,

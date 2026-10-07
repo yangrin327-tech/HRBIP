@@ -1086,7 +1086,7 @@ function SupportOutput({
       )}
       <div className="support-findings">
         {result.findings.map((f, i) => (
-          <article key={i} className={"support-finding " + f.level}>
+          <article key={i} className={"support-finding status-" + f.level}>
             <span className="tag">{names[f.level]}</span>
             <h3>{f.title}</h3>
             <p className="support-evidence">{f.evidence}</p>
