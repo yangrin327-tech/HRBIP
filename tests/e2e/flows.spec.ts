@@ -156,7 +156,7 @@ test("guest sample, report editing, linked filters, chart editor and PDF downloa
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "기존 인사 자료에서, 검토 가능한 보고서까지.",
+      name: "기존 인사 자료에서, 대시보드와 보고서까지.",
     }),
   ).toBeVisible();
   await page.screenshot({
@@ -366,7 +366,9 @@ test("real registration, save/reopen, template reuse without old data, feature r
     .getByLabel("원하는 기능", { exact: true })
     .fill("테스트: 휴가 사용 추이를 비교하고 싶어요.");
   await page.getByRole("button", { name: "기능 요청 저장" }).click();
-  await expect(page.getByText(/HRBIP의 기능 요청함에 저장했습니다/)).toBeVisible();
+  await expect(
+    page.getByText(/HRBIP의 기능 요청함에 저장했습니다/),
+  ).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole("button", { name: "HRBIP 홈" }).click();

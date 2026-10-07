@@ -55,6 +55,12 @@ import { DataReview } from "./DataReview";
 import { Results } from "./Results";
 import { prepareRepeat, type ReusePlan } from "../shared/reuse";
 import { RepeatReview } from "./RepeatReview";
+import {
+  quickTools,
+  toolFromHash,
+  QuickToolCards,
+  QuickToolPage,
+} from "./QuickTools";
 
 type User = { id: string; username: string };
 type Stored = {
@@ -69,7 +75,9 @@ type Stored = {
 type Template = { id: string; title: string; design: Design };
 export default function App() {
   const [w, rawSetW] = useState<Workspace>(emptyWorkspace),
-    [route, setRoute] = useState("home"),
+    [route, setRoute] = useState(() =>
+      toolFromHash() ? "tool:" + toolFromHash() : "home",
+    ),
     [originals, setOriginals] = useState<Original[]>([]);
   const [user, setUser] = useState<User | null>(null),
     [authOpen, setAuthOpen] = useState(false),
@@ -130,7 +138,7 @@ export default function App() {
         ) {
           const saved = await readBrowserWork(settings.activeWork);
           if (cancelled) return;
-          restoreBrowserWork(saved);
+          restoreBrowserWork(saved, true);
         }
       } catch (error) {
         if (!cancelled) setStorageError((error as Error).message);
@@ -183,7 +191,7 @@ export default function App() {
       reusePlan,
     });
   }
-  function restoreBrowserWork(saved: BrowserWork) {
+  function restoreBrowserWork(saved: BrowserWork, preserveTool = false) {
     rawSetW(saved.workspace);
     setWorkId(saved.id);
     setRevision(saved.revision);
@@ -194,6 +202,7 @@ export default function App() {
     setSharedId("");
     setSharedResult(null);
     setDirty(false);
+    if (preserveTool && toolFromHash()) return;
     setRoute(
       ["input", "repeat", "verify", "result"].includes(saved.route)
         ? saved.route
@@ -231,7 +240,22 @@ export default function App() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty, w.datasets.length, pendingSheets.length]);
+  useEffect(() => {
+    const syncRoute = () => {
+      const tool = toolFromHash();
+      setRoute(tool ? "tool:" + tool : history.state?.hrbipRoute || "home");
+    };
+    window.addEventListener("popstate", syncRoute);
+    window.addEventListener("hashchange", syncRoute);
+    return () => {
+      window.removeEventListener("popstate", syncRoute);
+      window.removeEventListener("hashchange", syncRoute);
+    };
+  }, []);
   function navigate(next: string) {
+    const url = new URL(location.href);
+    url.hash = next.startsWith("tool:") ? "tools/" + next.slice(5) : "";
+    history.pushState({ hrbipRoute: next }, "", url);
     setRoute(next);
     setError("");
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -584,6 +608,7 @@ export default function App() {
     }
   }
   const shared = route === "shared";
+  const activeTool = quickTools.find((tool) => route === "tool:" + tool.id);
   if (!accountReady || (guestMode && !browserReady))
     return (
       <main className="panel" role="status">
@@ -601,7 +626,15 @@ export default function App() {
       }}
     >
       <div className="app-shell">
-        <a className="skip-link" href="#main">
+        <a
+          className="skip-link"
+          href="#main"
+          onClick={(event) => {
+            event.preventDefault();
+            document.getElementById("main")?.focus();
+            document.getElementById("main")?.scrollIntoView();
+          }}
+        >
           본문으로 건너뛰기
         </a>
         <header className="topbar">
@@ -659,7 +692,7 @@ export default function App() {
                 }
               >
                 <BarChart3 size={19} />
-                인사현황 보고서
+                대시보드 자동화
               </button>
               {
                 <button
@@ -670,6 +703,23 @@ export default function App() {
                   저장한 작업
                 </button>
               }
+            </nav>
+            <div className="sidebar-label quick-nav-label">일상 업무 도구</div>
+            <nav
+              className="workspace-nav quick-nav"
+              aria-label="일상 업무 도구"
+            >
+              {quickTools.map(({ id, short, icon: Icon }) => (
+                <button
+                  key={id}
+                  className={activeTool?.id === id ? "selected" : ""}
+                  aria-current={activeTool?.id === id ? "page" : undefined}
+                  onClick={() => navigate("tool:" + id)}
+                >
+                  <Icon size={19} aria-hidden="true" />
+                  {short}
+                </button>
+              ))}
             </nav>
             <div className="sidebar-bottom">
               <span className="round-icon">
@@ -697,11 +747,13 @@ export default function App() {
                 ? "모든 도구"
                 : route === "saved"
                   ? "저장한 작업"
-                  : shared
-                    ? "공유 보고서"
-                    : "인사현황 보고서·대시보드"}
+                  : activeTool
+                    ? activeTool.title
+                    : shared
+                      ? "공유 보고서"
+                      : "인사현황 보고서·대시보드"}
             </div>
-            {guestMode ? (
+            {guestMode && !activeTool ? (
               <Notice>
                 로그인 없이 내 파일 또는 샘플로 시작하세요. 작업과 회사 양식은
                 이 브라우저에 자동 저장돼요. 새로고침하거나 다시 방문해도
@@ -709,7 +761,9 @@ export default function App() {
                 동기화되지 않으며, 브라우저 데이터를 지우면 삭제돼요.
               </Notice>
             ) : (
-              publicDemo && (
+              publicDemo &&
+              !guestMode &&
+              !activeTool && (
                 <Notice>
                   포트폴리오 체험용 공개 버전이에요. 가상 데이터로 이용해
                   주세요. 저장한 작업은 온라인 HRBIP 저장소에 보관되며, 내
@@ -762,7 +816,7 @@ export default function App() {
                     <h2 className="hero-message">
                       기존 인사 자료에서,
                       <br />
-                      검토 가능한 보고서까지.
+                      대시보드와 보고서까지.
                     </h2>
                     <p>
                       인사 시스템에서 내려받은 파일과 엑셀을 연결하세요.
@@ -772,7 +826,7 @@ export default function App() {
                     </p>
                     <div className="hero-actions">
                       <Button variant="primary" onClick={() => start()}>
-                        보고서 만들기 <ArrowRight size={22} />
+                        대시보드 만들기 <ArrowRight size={22} />
                       </Button>
                       <Button onClick={() => setSampleListOpen(true)}>
                         샘플로 먼저 보기
@@ -808,9 +862,9 @@ export default function App() {
                 <section className="tools-heading">
                   <div>
                     <span className="eyebrow">TOOLS FOR YOUR WORK</span>
-                    <h2>오늘의 업무, 여기서 시작해요.</h2>
+                    <h2>대표 도구 · 대시보드 자동화</h2>
                   </div>
-                  <span className="count-pill">사용 가능한 도구 1</span>
+                  <span className="count-pill">사용 가능한 도구 4</span>
                 </section>
                 <div className="home-tools">
                   <article className="featured-tool">
@@ -818,12 +872,12 @@ export default function App() {
                       <span className="tool-icon">
                         <BarChart3 size={26} />
                       </span>
-                      <span className="tag">첫 번째 도구</span>
+                      <span className="tag">대표 기능</span>
                     </div>
                     <h2>
-                      인사현황 보고서·
+                      인사 대시보드·
                       <br />
-                      대시보드 만들기
+                      보고서 자동화
                     </h2>
                     <p>
                       기존 인사 파일을 연결하면, 보유한 자료에 맞춰
@@ -902,6 +956,7 @@ export default function App() {
                     </article>
                   </div>
                 </div>
+                <QuickToolCards onOpen={(id) => navigate("tool:" + id)} />
                 <section className="request-banner">
                   <MessageSquarePlus size={26} />
                   <div>
@@ -916,6 +971,13 @@ export default function App() {
                   </Button>
                 </section>
               </>
+            )}
+            {activeTool && (
+              <QuickToolPage
+                key={activeTool.id}
+                id={activeTool.id}
+                onHome={() => navigate("home")}
+              />
             )}
             {route === "input" && (
               <DataInput

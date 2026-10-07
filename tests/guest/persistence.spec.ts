@@ -55,7 +55,7 @@ test("uploaded sheets and selections survive reload before mapping; templates co
 }) => {
   await page.goto("/");
   await page
-    .getByRole("button", { name: "보고서 만들기", exact: true })
+    .getByRole("button", { name: "대시보드 만들기", exact: true })
     .click();
   await page.getByLabel("파일 업로드").setInputFiles({
     name: "private.csv",
