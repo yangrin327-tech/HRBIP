@@ -462,3 +462,6 @@
 - 검증 산출물: Git 제외 artifacts/verification/hr-support/. 실제 Office 앱 검수는 별도. 상세 지원 조건은 docs/HR_SUPPORT_TOOLS.md. GitHub 푸시·공개 배포 확인은 수행 후 별도 기록한다.
 
 - 기능 커밋 666a8a5는 main에 푸시했다. 이후 모바일 직접 이미지 검수에서 결과의 check 상태 클래스가 기존 체크박스 flex 스타일을 상속하는 충돌을 발견했다. 상태 클래스에 전용 접두사를 적용하고 모바일 설명 너비 회귀 검사를 추가했으며 신규 7/7 및 빌드를 다시 통과했다.
+
+- 공개 배포 검증 완료: 기능 666a8a5 + 모바일 수정 5838b1f, Vercel JBf2atKZi54GaxBXK9UJ9ibxnVq7 성공. https://hrbip.vercel.app 에서 신규 7/7 흐름을 재실행해 다섯 도구·CSV/XLSX/DOCX/TXT·실제 숫자 Excel/TXT 다운로드·입력 복원/지우기·오류·대표 보고서 의견 유지·접근성·모바일을 확인했다. health는 ok:true, guestMode:true, publicDemo:true, storage:none.
+- 공개 검증 산출물은 Git 제외 artifacts/deployment/hr-support/에 보관한다. 로컬 자동 실행 서버 4173도 최신 빌드 응답과 health를 확인했다. 새 브라우저 탭을 만들지 않았다. 비밀값·인사 원본·별도 합성 데이터 생성 파일은 커밋하지 않았다.
