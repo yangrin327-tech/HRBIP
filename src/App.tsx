@@ -56,11 +56,11 @@ import { Results } from "./Results";
 import { prepareRepeat, type ReusePlan } from "../shared/reuse";
 import { RepeatReview } from "./RepeatReview";
 import {
-  quickTools,
+  supportTools,
   toolFromHash,
-  QuickToolCards,
-  QuickToolPage,
-} from "./QuickTools";
+  SupportToolCards,
+  SupportToolPage,
+} from "./SupportTools";
 
 type User = { id: string; username: string };
 type Stored = {
@@ -243,7 +243,14 @@ export default function App() {
   useEffect(() => {
     const syncRoute = () => {
       const tool = toolFromHash();
-      setRoute(tool ? "tool:" + tool : history.state?.hrbipRoute || "home");
+      const remembered = history.state?.hrbipRoute;
+      setRoute(
+        tool
+          ? "tool:" + tool
+          : typeof remembered === "string" && !remembered.startsWith("tool:")
+            ? remembered
+            : "home",
+      );
     };
     window.addEventListener("popstate", syncRoute);
     window.addEventListener("hashchange", syncRoute);
@@ -608,7 +615,7 @@ export default function App() {
     }
   }
   const shared = route === "shared";
-  const activeTool = quickTools.find((tool) => route === "tool:" + tool.id);
+  const activeTool = supportTools.find((tool) => route === "tool:" + tool.id);
   if (!accountReady || (guestMode && !browserReady))
     return (
       <main className="panel" role="status">
@@ -704,12 +711,14 @@ export default function App() {
                 </button>
               }
             </nav>
-            <div className="sidebar-label quick-nav-label">일상 업무 도구</div>
+            <div className="sidebar-label quick-nav-label">
+              추가 업무 지원 도구
+            </div>
             <nav
               className="workspace-nav quick-nav"
-              aria-label="일상 업무 도구"
+              aria-label="추가 업무 지원 도구"
             >
-              {quickTools.map(({ id, short, icon: Icon }) => (
+              {supportTools.map(({ id, short, icon: Icon }) => (
                 <button
                   key={id}
                   className={activeTool?.id === id ? "selected" : ""}
@@ -864,7 +873,9 @@ export default function App() {
                     <span className="eyebrow">TOOLS FOR YOUR WORK</span>
                     <h2>대표 도구 · 대시보드 자동화</h2>
                   </div>
-                  <span className="count-pill">사용 가능한 도구 4</span>
+                  <span className="count-pill">
+                    전체 도구 {supportTools.length + 1}
+                  </span>
                 </section>
                 <div className="home-tools">
                   <article className="featured-tool">
@@ -956,7 +967,7 @@ export default function App() {
                     </article>
                   </div>
                 </div>
-                <QuickToolCards onOpen={(id) => navigate("tool:" + id)} />
+                <SupportToolCards onOpen={(id) => navigate("tool:" + id)} />
                 <section className="request-banner">
                   <MessageSquarePlus size={26} />
                   <div>
@@ -973,7 +984,7 @@ export default function App() {
               </>
             )}
             {activeTool && (
-              <QuickToolPage
+              <SupportToolPage
                 key={activeTool.id}
                 id={activeTool.id}
                 onHome={() => navigate("home")}

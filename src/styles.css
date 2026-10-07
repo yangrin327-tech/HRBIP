@@ -14,7 +14,7 @@
   --radius: 16px;
 }
 
-/* Small, independent tools stay secondary to the dashboard workflow. */
+/* HR support tools stay secondary to the dashboard workflow. */
 .quick-nav-label {
   margin-top: 30px;
   letter-spacing: 0.3px;
@@ -22,6 +22,11 @@
 .quick-nav {
   border-top: 1px solid var(--line);
   padding-top: 12px;
+}
+.workspace-nav.quick-nav > button {
+  padding: 12px 8px;
+  gap: 8px;
+  word-break: keep-all;
 }
 .quick-tools-section {
   margin-top: 42px;
@@ -58,11 +63,110 @@
 }
 .quick-tool-card .button {
   margin-top: auto;
+  min-height: 48px;
+  width: 100%;
 }
 .quick-draft-note {
   font-size: 14px;
   color: var(--muted);
   margin-bottom: 24px;
+}
+.support-input > label,
+.support-input > .quick-fields,
+.support-input > .notice,
+.support-input > details {
+  margin-bottom: 24px;
+}
+.support-privacy {
+  margin: 20px 0 28px;
+}
+.support-privacy p {
+  color: var(--muted);
+  font-size: 15px;
+}
+.support-settlement-lines fieldset {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.support-settlement-lines legend {
+  font-weight: 600;
+  padding: 0 8px;
+}
+.support-input {
+  margin-bottom: 28px;
+}
+.support-topic-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 24px;
+}
+.support-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 24px 0;
+}
+.support-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.support-table-wrap th,
+.support-table-wrap td {
+  padding: 14px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.support-table-wrap caption {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: 12px;
+}
+.support-findings {
+  display: grid;
+  gap: 18px;
+  margin: 24px 0;
+}
+.support-finding {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.support-finding.difference {
+  border-left: 4px solid #a02e20;
+}
+.support-finding h3 {
+  font-size: 19px;
+  margin: 12px 0;
+}
+.support-finding p,
+.support-output li {
+  font-size: 16px;
+}
+.support-evidence {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.support-output > label {
+  margin: 24px 0;
+}
+.support-output details {
+  margin: 20px 0;
+}
+.support-output summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 600;
+}
+.support-scope {
+  color: var(--muted);
+  font-size: 15px;
 }
 .quick-two-columns {
   display: grid;
