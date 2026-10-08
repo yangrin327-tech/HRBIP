@@ -23,6 +23,11 @@ test("report edits and filters survive reload, a new tab, and switching saved wo
   );
   const second = await context.newPage();
   await second.goto("/");
+  await expect(second.locator("#intro-title")).toBeVisible();
+  await openSavedWorks(second);
+  await second.locator(".saved-list article")
+    .filter({ hasText: "2026년 3분기 인사현황" })
+    .getByRole("button", { name: "열기", exact: false }).click();
   await second.getByRole("tab", { name: "보고서", exact: true }).click();
   await expect(second.getByLabel("담당자 설명·의견")).toHaveValue(
     "직접 작성한 문장: 다음 달 확인 필요.",
@@ -65,6 +70,7 @@ test("uploaded sheets and selections survive reload before mapping; templates co
     page.getByText("private.csv", { exact: false }).first(),
   ).toBeVisible();
   await openSavedWorks(page);
+  await page.locator(".saved-list article").getByRole("button", { name: "열기", exact: false }).click();
   await page.reload();
   await expect(
     page.getByText("private.csv", { exact: false }).first(),
@@ -119,6 +125,10 @@ test("another tab cannot silently overwrite edits; a separate copy can be saved"
   await expect(page.locator(".save-state")).toContainText("자동 저장했어요");
   const second = await context.newPage();
   await second.goto("/");
+  await expect(second.locator("#intro-title")).toBeVisible();
+  await openSavedWorks(second);
+  await second.locator(".saved-list article")
+    .getByRole("button", { name: "열기", exact: false }).click();
   await expect(second.locator(".save-state")).toContainText("자동 저장했어요");
   await second.getByRole("tab", { name: "보고서", exact: true }).click();
   await second.getByLabel("담당자 설명·의견").fill("두 번째 탭의 의견");

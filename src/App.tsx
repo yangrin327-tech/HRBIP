@@ -76,12 +76,27 @@ type Stored = {
   originalCount: number;
 };
 type Template = { id: string; title: string; design: Design };
+
+function initialRoute() {
+  const tool = toolFromHash();
+  if (tool) return "tool:" + tool;
+  const navigation = performance.getEntriesByType("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  const remembered = history.state?.hrbipRoute;
+  // A new visit opens the introduction. Refreshing an open work keeps its view.
+  return navigation?.type === "reload" &&
+    ["input", "repeat", "verify", "result"].includes(remembered)
+    ? remembered
+    : "home";
+}
+
 export default function App() {
   const [resultEntry, setResultEntry] = useState<{ view: ResultView; revision: number }>({ view: "dashboard", revision: 0 });
+  const [entryRoute] = useState<string>(initialRoute);
+  const navigatedSinceEntry = useRef(false);
   const [w, rawSetW] = useState<Workspace>(emptyWorkspace),
-    [route, setRoute] = useState(() =>
-      toolFromHash() ? "tool:" + toolFromHash() : "home",
-    ),
+    [route, setRoute] = useState<string>(() => entryRoute.startsWith("tool:") ? entryRoute : "home"),
     [originals, setOriginals] = useState<Original[]>([]);
   const [user, setUser] = useState<User | null>(null),
     [authOpen, setAuthOpen] = useState(false),
@@ -136,6 +151,9 @@ export default function App() {
     [w, route, sharedResult],
   );
   useEffect(() => {
+    history.replaceState({ ...history.state, hrbipRoute: route }, "");
+  }, []);
+  useEffect(() => {
     if (!accountReady) return;
     let cancelled = false;
     (async () => {
@@ -150,7 +168,12 @@ export default function App() {
         ) {
           const saved = await readBrowserWork(settings.activeWork);
           if (cancelled) return;
+          if (navigatedSinceEntry.current) return;
           restoreBrowserWork(saved, true);
+          if (["input", "repeat", "verify", "result"].includes(entryRoute)) {
+            history.replaceState({ ...history.state, hrbipRoute: entryRoute }, "");
+            setRoute(entryRoute);
+          }
         }
       } catch (error) {
         if (!cancelled) setStorageError((error as Error).message);
@@ -161,7 +184,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [accountReady, guestMode]);
+  }, [accountReady, guestMode, entryRoute]);
   useEffect(() => {
     if (!guestMode || !browserReady || !workId || route === "shared") return;
     const sequence = ++saveSequence.current;
@@ -203,7 +226,7 @@ export default function App() {
       reusePlan,
     });
   }
-  function restoreBrowserWork(saved: BrowserWork, preserveTool = false) {
+  function restoreBrowserWork(saved: BrowserWork, preserveRoute = false) {
     rawSetW(saved.workspace);
     setWorkId(saved.id);
     setRevision(saved.revision);
@@ -214,8 +237,9 @@ export default function App() {
     setSharedId("");
     setSharedResult(null);
     setDirty(false);
-    if (preserveTool && toolFromHash()) return;
-    setRoute(
+    // Loading saved data must not redirect a new visitor away from the home page.
+    if (preserveRoute) return;
+    navigate(
       ["input", "repeat", "verify", "result"].includes(saved.route)
         ? saved.route
         : "home",
@@ -293,6 +317,7 @@ export default function App() {
   function beginInput() { setResultEntry({ view: "dashboard", revision: Date.now() }); start(); }
   function showSamples() { setResultEntry({ view: "dashboard", revision: Date.now() }); setSampleListOpen(true); }
   function navigate(next: string) {
+    navigatedSinceEntry.current = true;
     const url = new URL(location.href);
     url.hash = next.startsWith("tool:") ? "tools/" + next.slice(5) : "";
     history.pushState({ hrbipRoute: next }, "", url);

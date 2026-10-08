@@ -1,10 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** One wheel gesture = one page; normal scrolling remains available on small screens. */
 export function useHomePager(count: number) {
   const viewport = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const current = useRef(0), movingUntil = useRef(0);
+  useLayoutEffect(() => {
+    const reset = () => {
+      current.current = 0;
+      movingUntil.current = 0;
+      setActive(0);
+      viewport.current?.scrollTo({ top: 0, behavior: "instant" });
+      window.scrollTo({ top: 0, behavior: "instant" });
+    };
+    reset();
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
   const move = (next: number) => {
     const el = viewport.current;
     if (!el) return;
